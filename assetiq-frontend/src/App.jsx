@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import Login from './views/Login';
 import Register from './views/Register';
+import LandingPage from './views/LandingPage';
 import Dashboard from './views/Dashboard';
 import Assets from './views/Assets';
 import Locations from './views/Locations';
@@ -9,16 +10,49 @@ import Maintenance from './views/Maintenance';
 import Warranties from './views/Warranties';
 import Reports from './views/Reports';
 import SuperAdmin from './views/SuperAdmin';
+import OrganizationSetup from './views/OrganizationSetup';
 
 import { 
   ShieldCheck, LayoutDashboard, Package, MapPin, 
-  Wrench, ShieldCheck as ShieldIcon, BarChart2, Globe, LogOut, User 
+  Wrench, ShieldCheck as ShieldIcon, BarChart2, Globe, LogOut, User, Settings
 } from 'lucide-react';
 
 function AppContent() {
   const { user, loading, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [showLogin, setShowLogin] = useState(true);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Custom routing navigation function
+  const navigate = (path) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+  };
+
+  // Sync state with browser Back/Forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Enforce session routing bounds
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        // Authenticated users should not access login, register, or landing pages
+        if (['/', '/login', '/register'].includes(currentPath)) {
+          navigate('/dashboard');
+        }
+      } else {
+        // Unauthenticated users should be redirected to landing page or login if trying to access dashboard
+        if (currentPath === '/dashboard') {
+          navigate('/login');
+        }
+      }
+    }
+  }, [user, loading, currentPath]);
 
   if (loading) {
     return (
@@ -28,16 +62,34 @@ function AppContent() {
     );
   }
 
-  // 1. Unauthenticated State
+  // 1. Unauthenticated State Routing
   if (!user) {
-    return showLogin ? (
-      <Login onSwitchToRegister={() => setShowLogin(false)} />
-    ) : (
-      <Register onSwitchToLogin={() => setShowLogin(true)} />
+    if (currentPath === '/login') {
+      return (
+        <Login 
+          onSwitchToRegister={() => navigate('/register')} 
+          onBackToLanding={() => navigate('/')} 
+        />
+      );
+    }
+    if (currentPath === '/register') {
+      return (
+        <Register 
+          onSwitchToLogin={() => navigate('/login')} 
+          onBackToLanding={() => navigate('/')} 
+        />
+      );
+    }
+    // Default to Landing Page for the base path '/' and other unmapped paths
+    return (
+      <LandingPage 
+        onNavigateToLogin={() => navigate('/login')} 
+        onNavigateToRegister={() => navigate('/register')} 
+      />
     );
   }
 
-  // 2. Authenticated State: Main Layout with left Sidebar and right Content Panel
+  // 2. Authenticated State: Dashboard Shell (Only accessible under '/dashboard')
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -52,6 +104,8 @@ function AppContent() {
         return <Warranties />;
       case 'reports':
         return <Reports />;
+      case 'setup':
+        return <OrganizationSetup />;
       case 'superadmin':
         return user.role === 'super_admin' ? <SuperAdmin /> : <Dashboard />;
       default:
@@ -66,8 +120,14 @@ function AppContent() {
     { id: 'maintenance', label: 'Maintenance', icon: Wrench, roles: ['super_admin', 'org_admin', 'asset_manager', 'employee'] },
     { id: 'warranties', label: 'Warranties', icon: ShieldIcon, roles: ['super_admin', 'org_admin', 'asset_manager', 'employee'] },
     { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['super_admin', 'org_admin', 'asset_manager'] },
+    { id: 'setup', label: 'Org Setup', icon: Settings, roles: ['super_admin', 'org_admin'] },
     { id: 'superadmin', label: 'Platform Controls', icon: Globe, roles: ['super_admin'] },
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
@@ -122,7 +182,7 @@ function AppContent() {
           </div>
 
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-slate-800 hover:bg-slate-700 hover:text-white text-slate-300 text-xs font-bold rounded-xl border border-slate-700 cursor-pointer transition-all active:scale-[0.98]"
           >
             <LogOut className="h-3.5 w-3.5" />

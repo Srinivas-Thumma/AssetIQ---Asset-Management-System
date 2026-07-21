@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, Mail, Lock } from 'lucide-react';
 
-export default function Login({ onSwitchToRegister }) {
+export default function Login({ onSwitchToRegister, onBackToLanding }) {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +28,14 @@ export default function Login({ onSwitchToRegister }) {
       <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-md bg-slate-900/60 border border-slate-800 rounded-2xl p-8 backdrop-blur-md shadow-2xl relative">
+      <div className="w-full max-w-md bg-slate-900/60 border border-slate-800 rounded-2xl p-8 backdrop-blur-md shadow-2xl relative flex flex-col">
+        <button 
+          onClick={onBackToLanding}
+          className="text-xs font-bold text-slate-500 hover:text-slate-200 mb-6 self-start cursor-pointer transition-colors flex items-center gap-1"
+        >
+          &larr; Back to Landing Page
+        </button>
+        
         <div className="flex flex-col items-center mb-8">
           <div className="p-3 bg-gradient-to-tr from-blue-600 to-emerald-500 rounded-xl mb-4 shadow-lg shadow-blue-500/25">
             <ShieldCheck className="h-8 w-8 text-white" />

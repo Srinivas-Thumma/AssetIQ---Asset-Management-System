@@ -10,6 +10,7 @@ import { Floor } from '../models/Floor.js';
 import { Room } from '../models/Room.js';
 import { Department } from '../models/Department.js';
 import { Category } from '../models/Category.js';
+import { Employee } from '../models/Employee.js';
 import { sendResponse } from '../utils/apiResponse.js';
 import { runWithTenant } from '../utils/tenantContext.js';
 
@@ -89,11 +90,43 @@ export const register = async (req, res, next) => {
       const defaultBranch = await Branch.create({ name: 'Headquarters', code: 'HQ' });
       const defaultBuilding = await Building.create({ branchId: defaultBranch._id, name: 'Main Office', code: 'MO' });
       const defaultFloor = await Floor.create({ buildingId: defaultBuilding._id, name: 'Ground Floor', number: 0 });
-      await Room.create({ floorId: defaultFloor._id, name: 'IT Lab Room', code: 'IT-LAB' });
+      const defaultRoom = await Room.create({ floorId: defaultFloor._id, name: 'IT Lab Room', code: 'IT-LAB' });
 
-      await Department.create({ name: 'Information Technology', code: 'IT' });
+      const defaultDept = await Department.create({ name: 'Information Technology', code: 'IT' });
       await Category.create({ name: 'Laptops & Computers', code: 'IT-COMP' });
       await Category.create({ name: 'HVAC Systems', code: 'HVAC' });
+
+      // Seed an Employee profile for testing
+      const managerEmp = await Employee.create({
+        name: 'Jane Manager',
+        employeeId: 'EMP-MGR-01',
+        email: `manager@${validated.orgSlug}.com`,
+        departmentId: defaultDept._id
+      });
+
+      const regularEmp = await Employee.create({
+        name: 'John Staff',
+        employeeId: 'EMP-STF-02',
+        email: `employee@${validated.orgSlug}.com`,
+        departmentId: defaultDept._id
+      });
+
+      // Create login users for manager and employee
+      await User.create({
+        email: `manager@${validated.orgSlug}.com`,
+        passwordHash: 'password123',
+        role: 'asset_manager',
+        employeeRef: managerEmp._id,
+        organizationId: orgIdString
+      });
+
+      await User.create({
+        email: `employee@${validated.orgSlug}.com`,
+        passwordHash: 'password123',
+        role: 'employee',
+        employeeRef: regularEmp._id,
+        organizationId: orgIdString
+      });
 
       return { user: newAdmin };
     });

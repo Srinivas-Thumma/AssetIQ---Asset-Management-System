@@ -4,6 +4,16 @@ import { tenantScopePlugin } from './plugins/tenantScope.plugin.js';
 
 const userSchema = new mongoose.Schema(
   {
+    // Tenant users must belong to an organization. Platform super admins are
+    // deliberately global, so their organizationId is null.
+    organizationId: {
+      type: String,
+      default: null,
+      index: true,
+      required: function () {
+        return this.role !== 'super_admin';
+      },
+    },
     email: {
       type: String,
       required: true,
