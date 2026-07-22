@@ -42,7 +42,7 @@ const userSchema = new mongoose.Schema(
 );
 
 // Compound unique index for email per organization
-userSchema.index({ organizationId: 1, email: 1 }, { unique: true });
+userSchema.index({ email: 1 }, { unique: true });
 
 // Pre-save hook to hash password if modified
 userSchema.pre('save', async function (next) {

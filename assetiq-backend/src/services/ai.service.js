@@ -1,6 +1,7 @@
 import { env } from '../config/env.js';
 import { MaintenanceHistory } from '../models/MaintenanceHistory.js';
 import { Category } from '../models/Category.js';
+import { AiAuditLog } from '../models/AiAuditLog.js';
 
 // Deterministic mock algorithm for backup/demo mode
 export const generateMockScore = (asset, categoryName, history) => {
@@ -67,6 +68,17 @@ export const analyzeAssetHealth = async (asset, forceRecompute = false) => {
     (Date.now() - new Date(asset.ai.lastAnalyzedAt).getTime()) < 24 * 60 * 60 * 1000
   ) {
     return asset.ai;
+  }
+
+  // 1.5. Log the active AI calculation for platform statistics tracking
+  try {
+    await AiAuditLog.create({
+      organizationId: asset.organizationId || null,
+      assetId: asset._id,
+      timestamp: new Date()
+    });
+  } catch (err) {
+    console.error('⚠️ AI Service: Failed to write to AiAuditLog:', err.message);
   }
 
   try {

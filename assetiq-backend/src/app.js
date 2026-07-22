@@ -18,7 +18,7 @@ import adminRouter from './routes/admin.route.js';
 
 const app = express();
 
-// Midlewares
+// Middlewares
 app.use(cors({
   origin: '*', // Allow all client queries during local development
   credentials: true

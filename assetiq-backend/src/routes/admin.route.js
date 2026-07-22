@@ -3,8 +3,10 @@ import { protect } from '../middlewares/auth.middleware.js';
 import { requireRole } from '../middlewares/rbac.middleware.js';
 import {
   getOrganizations,
-  updateOrganizationStatus,
-  getPlatformAnalytics
+  createOrganization,
+  updateOrganization,
+  getPlatformAnalytics,
+  getPlans
 } from '../controllers/admin.controller.js';
 
 const router = express.Router();
@@ -13,8 +15,12 @@ const router = express.Router();
 router.use(protect);
 router.use(requireRole('super_admin'));
 
-router.get('/organizations', getOrganizations);
-router.put('/organizations/:id', updateOrganizationStatus);
+router.route('/organizations')
+  .get(getOrganizations)
+  .post(createOrganization);
+
+router.put('/organizations/:id', updateOrganization);
 router.get('/analytics', getPlatformAnalytics);
+router.get('/plans', getPlans);
 
 export default router;

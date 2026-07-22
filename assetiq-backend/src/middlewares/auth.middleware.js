@@ -18,11 +18,7 @@ export const protect = async (req, res, next) => {
       message: 'Not authorized to access this route, no token provided',
     });
   }
-
-  try {
-    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET);
-    
-    // Find user. Note: since User has tenantScopePlugin, we must run this query 
+  // Find user. Note: since User has tenantScopePlugin, we must run this query 
     // under tenant scope or bypass it. But wait! Since user registration/login JWT contains
     // organizationId, we can set tenant storage context before loading the user, or 
     // bypass tenantScopePlugin for auth validation.
@@ -36,6 +32,10 @@ export const protect = async (req, res, next) => {
     // To do that, we can temporarily retrieve the user.
     // Wait, User has a tenantScopePlugin. If getTenantId() is not set yet, User.findById(decoded.id) 
     // will execute without scoping, which is perfectly safe since we are fetching by a unique MongoDB ObjectId!
+
+  try {
+    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET);
+
     const user = await User.findById(decoded.id);
 
     if (!user) {
@@ -53,6 +53,8 @@ export const protect = async (req, res, next) => {
     }
 
     req.user = user;
+    req.orgId = user.organizationId;
+    
     next();
   } catch (error) {
     console.error('JWT Auth Error:', error.message);

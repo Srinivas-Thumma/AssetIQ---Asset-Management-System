@@ -9,17 +9,25 @@ import { generateAssetQR } from '../services/qr.service.js';
 import { analyzeAssetHealth } from '../services/ai.service.js';
 import { sendResponse } from '../utils/apiResponse.js';
 
+
 export const getAssets = async (req, res, next) => {
   try {
+    console.log("req.orgId:", req.orgId);
+    console.log("req.user:", req.user);
+
     const { status, categoryId, roomId, assignedTo, search } = req.query;
     const filter = {};
+
+    // Restrict employees to only see assets assigned to them
+    if (req.user.role === 'employee') {
+      filter.assignedTo = req.user.employeeRef;
+    } else if (assignedTo) {
+      filter.assignedTo = assignedTo === 'null' ? null : assignedTo;
+    }
 
     if (status) filter.status = status;
     if (categoryId) filter.categoryId = categoryId;
     if (roomId) filter.roomId = roomId;
-    if (assignedTo) {
-      filter.assignedTo = assignedTo === 'null' ? null : assignedTo;
-    }
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -94,7 +102,11 @@ export const createAsset = async (req, res, next) => {
 
     // 1. Plan Limit Enforcement
     // Load the organization and check its plan asset limit
-    const org = await Organization.findById(req.orgId).populate('planId');
+ console.log("req.orgId:", req.orgId);
+
+const org = await Organization.findById(req.orgId).populate("planId");
+
+console.log("Organization:", org);
     if (!org) {
       return sendResponse(res, 400, false, 'Organization context not found');
     }

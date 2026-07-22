@@ -154,7 +154,26 @@ export const login = async (req, res, next) => {
     const validated = loginSchema.parse(req.body);
 
     // Bypass tenant scope to find user globally (and verify organization is active)
-    const user = await User.findOne({ email: validated.email });
+   const user = await User.findOne({ email: validated.email });
+
+console.log("Login email:", validated.email);
+console.log("User:", user);
+
+if (user) {
+  console.log("Stored Hash:", user.passwordHash);
+
+  const bcrypt = (await import("bcryptjs")).default;
+
+  console.log(
+    "Compare password123:",
+    await bcrypt.compare("password123", user.passwordHash)
+  );
+
+  console.log(
+    "Compare entered password:",
+    await bcrypt.compare(validated.password, user.passwordHash)
+  );
+}
     if (!user) {
       return sendResponse(res, 401, false, 'Invalid credentials');
     }
@@ -216,5 +235,67 @@ export const refresh = async (req, res, next) => {
     });
   } catch (error) {
     return sendResponse(res, 401, false, 'Invalid or expired refresh token');
+  }
+};
+
+export const createOrgUser = async (req, res, next) => {
+  try {
+    const { name, email, password, role, departmentId } = req.body;
+    if (!name || !email || !password || !role || !departmentId) {
+      return sendResponse(res, 400, false, 'name, email, password, role, and departmentId are required');
+    }
+
+    if (!['asset_manager', 'employee'].includes(role)) {
+      return sendResponse(res, 400, false, 'Invalid role choice. Must be asset_manager or employee');
+    }
+
+    // Check email uniqueness globally
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return sendResponse(res, 400, false, 'Email is already registered on this platform');
+    }
+
+    // 1. Create Employee Profile record
+    const empId = `EMP-${Date.now().toString().slice(-4)}`;
+    const employee = await Employee.create({
+      name,
+      employeeId: empId,
+      email,
+      departmentId,
+      organizationId: req.orgId
+    });
+
+    // 2. Create User login credentials
+    const user = await User.create({
+      email,
+      passwordHash: password, // Auto-hashed by pre-save User hook
+      role,
+      employeeRef: employee._id,
+      organizationId: req.orgId
+    });
+
+    return sendResponse(res, 201, true, 'Staff login account registered successfully', {
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role
+      },
+      employee
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getOrgUsers = async (req, res, next) => {
+  try {
+    const users = await User.find()
+      .populate({
+        path: 'employeeRef',
+        populate: { path: 'departmentId' }
+      });
+    return sendResponse(res, 200, true, 'Staff accounts retrieved', users);
+  } catch (error) {
+    next(error);
   }
 };
