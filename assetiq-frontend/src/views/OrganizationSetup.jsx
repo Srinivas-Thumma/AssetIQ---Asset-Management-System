@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Building2, Tag, Users, Contact, Plus, RefreshCw, 
-  Mail, Phone, MapPin, Hash, Briefcase 
+  Mail, Phone, MapPin, Hash, Briefcase, Key, ShieldAlert 
 } from 'lucide-react';
 
 export default function OrganizationSetup() {
@@ -16,6 +16,7 @@ export default function OrganizationSetup() {
   const [categories, setCategories] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [users, setUsers] = useState([]); // Registered login accounts
 
   // Form submits state
   const [submitting, setSubmitting] = useState(false);
@@ -25,23 +26,30 @@ export default function OrganizationSetup() {
   const [deptForm, setDeptForm] = useState({ name: '', code: '' });
   const [catForm, setCatForm] = useState({ name: '', code: '' });
   const [vendorForm, setVendorForm] = useState({ name: '', contactEmail: '', phone: '', address: '' });
+  
+  // Employee form state
   const [employeeForm, setEmployeeForm] = useState({ name: '', employeeId: '', email: '', departmentId: '' });
+  const [createAccount, setCreateAccount] = useState(false);
+  const [userPassword, setUserPassword] = useState('password123');
+  const [userRole, setUserRole] = useState('employee'); // employee | asset_manager
 
   const fetchData = async () => {
     setRefreshing(true);
     setError('');
     try {
-      const [deptRes, catRes, vendRes, empRes] = await Promise.all([
+      const [deptRes, catRes, vendRes, empRes, userRes] = await Promise.all([
         apiCall('/api/v1/lookups/departments'),
         apiCall('/api/v1/lookups/categories'),
         apiCall('/api/v1/lookups/vendors'),
-        apiCall('/api/v1/lookups/employees')
+        apiCall('/api/v1/lookups/employees'),
+        apiCall('/api/v1/auth/users')
       ]);
 
       if (deptRes.success) setDepartments(deptRes.data);
       if (catRes.success) setCategories(catRes.data);
       if (vendRes.success) setVendors(vendRes.data);
       if (empRes.success) setEmployees(empRes.data);
+      if (userRes.success) setUsers(userRes.data);
     } catch (err) {
       console.error(err);
       setError('Failed to fetch lookup configurations.');
@@ -125,16 +133,37 @@ export default function OrganizationSetup() {
     e.preventDefault();
     setSubmitting(true);
     setError('');
+    
     try {
-      const res = await apiCall('/api/v1/lookups/employees', {
-        method: 'POST',
-        body: JSON.stringify(employeeForm)
-      });
+      let res;
+      if (createAccount) {
+        // Create BOTH Employee Profile AND User Login Credentials
+        res = await apiCall('/api/v1/auth/users', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: employeeForm.name,
+            email: employeeForm.email,
+            password: userPassword,
+            role: userRole,
+            departmentId: employeeForm.departmentId
+          })
+        });
+      } else {
+        // Create Employee Profile ONLY
+        res = await apiCall('/api/v1/lookups/employees', {
+          method: 'POST',
+          body: JSON.stringify(employeeForm)
+        });
+      }
+
       if (res.success) {
         setEmployeeForm({ name: '', employeeId: '', email: '', departmentId: '' });
+        setCreateAccount(false);
+        setUserPassword('password123');
+        setUserRole('employee');
         fetchData();
       } else {
-        setError(res.message || 'Failed to create employee');
+        setError(res.message || 'Failed to register employee');
       }
     } catch (err) {
       setError('Connection failure.');
@@ -164,7 +193,7 @@ export default function OrganizationSetup() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Organization Setup</h1>
-          <p className="text-slate-500 mt-1">Configure metadata mappings, suppliers, and staff directories.</p>
+          <p className="text-slate-500 mt-1">Configure departments, classifications, vendors, and manage staff login accounts.</p>
         </div>
         <button
           onClick={fetchData}
@@ -303,19 +332,43 @@ export default function OrganizationSetup() {
                     <th className="py-4 px-6">Employee ID</th>
                     <th className="py-4 px-6">Corporate Email</th>
                     <th className="py-4 px-6">Department</th>
+                    <th className="py-4 px-6">System Access</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
-                  {employees.map((emp) => (
-                    <tr key={emp._id} className="hover:bg-slate-50/50">
-                      <td className="py-4 px-6 font-semibold text-slate-800">{emp.name}</td>
-                      <td className="py-4 px-6 font-mono text-slate-500 text-xs font-bold">{emp.employeeId}</td>
-                      <td className="py-4 px-6 text-slate-600">{emp.email}</td>
-                      <td className="py-4 px-6"><span className="px-2 py-0.5 bg-slate-100 rounded-md text-xs">{emp.departmentId?.name || 'N/A'}</span></td>
-                    </tr>
-                  ))}
+                  {employees.map((emp) => {
+                    const associatedUser = users.find(
+                      (u) => u.employeeRef?._id === emp._id || u.email?.toLowerCase() === emp.email?.toLowerCase()
+                    );
+                    
+                    return (
+                      <tr key={emp._id} className="hover:bg-slate-50/50">
+                        <td className="py-4 px-6 font-semibold text-slate-800">{emp.name}</td>
+                        <td className="py-4 px-6 font-mono text-slate-500 text-xs font-bold">{emp.employeeId}</td>
+                        <td className="py-4 px-6 text-slate-600">{emp.email}</td>
+                        <td className="py-4 px-6">
+                          <span className="px-2 py-0.5 bg-slate-100 rounded-md text-xs">
+                            {emp.departmentId?.name || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          {associatedUser ? (
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                              associatedUser.role === 'asset_manager'
+                                ? 'bg-blue-50 border-blue-100 text-blue-700'
+                                : 'bg-indigo-50 border-indigo-100 text-indigo-700'
+                            } capitalize`}>
+                              {associatedUser.role.replace('_', ' ')}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">No Login Account</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {employees.length === 0 && (
-                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="4">No employees registered.</td></tr>
+                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="5">No employees registered.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -468,18 +521,7 @@ export default function OrganizationSetup() {
                   placeholder="e.g. John Doe"
                   value={employeeForm.name}
                   onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Employee ID (Unique)</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. EMP-102"
-                  value={employeeForm.employeeId}
-                  onChange={(e) => setEmployeeForm({ ...employeeForm, employeeId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400 font-mono"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
                 />
               </div>
               <div>
@@ -493,6 +535,21 @@ export default function OrganizationSetup() {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
                 />
               </div>
+              
+              {!createAccount && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Employee ID (Unique)</label>
+                  <input
+                    type="text"
+                    required={!createAccount}
+                    placeholder="e.g. EMP-102"
+                    value={employeeForm.employeeId}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, employeeId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400 font-mono"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 font-sans">Department</label>
                 <select
@@ -507,16 +564,57 @@ export default function OrganizationSetup() {
                   ))}
                 </select>
                 {departments.length === 0 && (
-                  <span className="text-[10px] text-slate-400 block mt-1">Please register a department first.</span>
+                  <span className="text-[10px] text-red-500 block mt-1">Please register a department first.</span>
                 )}
               </div>
+
+              {/* Login Account Provision Option */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-3.5">
+                <label className="flex items-center gap-2.5 cursor-pointer text-slate-700 select-none">
+                  <input
+                    type="checkbox"
+                    checked={createAccount}
+                    onChange={(e) => setCreateAccount(e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-xs font-bold">Create System Login Account</span>
+                </label>
+
+                {createAccount && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200/50 animate-fade-in">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Access Role Level</label>
+                      <select
+                        value={userRole}
+                        onChange={(e) => setUserRole(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-xs font-semibold text-slate-705 focus:outline-none"
+                      >
+                        <option value="employee">Employee (Read-only own assets)</option>
+                        <option value="asset_manager">Asset Manager (Manage inventories)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Access Password</label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="Default password"
+                        value={userPassword}
+                        onChange={(e) => setUserPassword(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs text-slate-800 focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || departments.length === 0}
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" />
-                Register Employee
+                {createAccount ? 'Provision User Account' : 'Register Employee'}
               </button>
             </form>
           )}

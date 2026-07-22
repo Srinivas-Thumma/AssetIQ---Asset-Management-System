@@ -399,7 +399,7 @@ export default function LandingPage({ onNavigateToLogin, onNavigateToRegister })
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-950 text-slate-600 text-xs py-8 text-center border-t border-slate-900 max-w-7xl mx-auto rounded-t-2xl">
+      <footer className="bg-slate-900 text-slate-400 text-s py-8 text-center  max-w-screen mx-auto border-t border-slate-400">
         <p>© 2026 AssetIQ Systems. Built for solo offline deployment and explainable reviews. All rights reserved.</p>
       </footer>
     </div>
