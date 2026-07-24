@@ -60,6 +60,26 @@ const assetSchema = new mongoose.Schema(
         type: [String],
         default: [],
       },
+      predictedNextMaintenanceDate: {
+        type: Date,
+        default: null,
+      },
+      failureRiskPercent: {
+        type: Number,
+        default: 0,
+      },
+      remainingUsefulLifeMonths: {
+        type: Number,
+        default: null,
+      },
+      replacementRecommendation: {
+        type: String,
+        default: null,
+      },
+      priority: {
+        type: String,
+        default: null,
+      },
     },
   },
   { timestamps: true }

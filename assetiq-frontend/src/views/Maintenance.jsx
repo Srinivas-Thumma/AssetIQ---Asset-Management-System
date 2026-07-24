@@ -149,7 +149,7 @@ export default function Maintenance() {
         </div>
         <button
           onClick={() => setShowScheduleModal(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-500 hover:to-emerald-400 text-white font-semibold py-2.5 px-5 rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98]"
+          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-semibold py-2.5 px-5 rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98]"
         >
           <Plus className="h-5 w-5" />
           Schedule Servicing

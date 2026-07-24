@@ -30,6 +30,7 @@ export const createWarranty = async (req, res, next) => {
     }
 
     const warranty = await Warranty.create({
+      organizationId: req.orgId,
       assetId,
       provider,
       startDate,

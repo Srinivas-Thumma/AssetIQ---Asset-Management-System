@@ -3,8 +3,8 @@ import { Asset } from '../models/Asset.js';
 import { analyzeAssetHealth } from '../services/ai.service.js';
 
 export const startHealthScoreJob = () => {
-  // Run nightly at 02:00 AM
-  cron.schedule('0 2 * * *', async () => {
+  // Run every minute
+  cron.schedule('0 * * * *', async () => {
     console.log('⏰ AI Health Score Job: Starting nightly calculations...');
     try {
       // Find all assets that are not retired
@@ -22,6 +22,8 @@ export const startHealthScoreJob = () => {
             healthScore: analysis.healthScore,
             insights: analysis.insights,
             lastAnalyzedAt: analysis.lastAnalyzedAt,
+            predictedNextMaintenanceDate: analysis.predictedNextMaintenanceDate || null,
+            failureRiskPercent: analysis.failureRiskPercent || 0,
           };
 
           // Temporarily bypass tenant validation or save within the context of the asset's own tenant

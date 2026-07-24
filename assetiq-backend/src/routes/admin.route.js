@@ -6,7 +6,11 @@ import {
   createOrganization,
   updateOrganization,
   getPlatformAnalytics,
-  getPlans
+  getPlans,
+  createPlan,
+  updatePlan,
+  deletePlan,
+  getStorageUsage
 } from '../controllers/admin.controller.js';
 
 const router = express.Router();
@@ -21,6 +25,14 @@ router.route('/organizations')
 
 router.put('/organizations/:id', updateOrganization);
 router.get('/analytics', getPlatformAnalytics);
-router.get('/plans', getPlans);
+router.get('/storage-usage', getStorageUsage);
+
+router.route('/plans')
+  .get(getPlans)
+  .post(createPlan);
+
+router.route('/plans/:id')
+  .put(updatePlan)
+  .delete(deletePlan);
 
 export default router;

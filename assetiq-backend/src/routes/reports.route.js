@@ -14,10 +14,11 @@ const router = express.Router();
 router.use(protect);
 router.use(tenantScope);
 
+router.get('/asset-summary', getAssetSummaryReport);
+
 // Limit report access to managers/admins
 router.use(requireRole('org_admin', 'super_admin', 'asset_manager'));
 
-router.get('/asset-summary', getAssetSummaryReport);
 router.get('/maintenance-cost', getMaintenanceCostReport);
 router.get('/location-wise', getLocationReport);
 

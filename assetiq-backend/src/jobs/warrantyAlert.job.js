@@ -1,10 +1,13 @@
 import cron from 'node-cron';
 import { Warranty } from '../models/Warranty.js';
 import { Asset } from '../models/Asset.js';
+import { User } from '../models/User.js';
+import { Notification } from '../models/Notification.js';
+import { runWithTenant } from '../utils/tenantContext.js';
 
 export const startWarrantyJob = () => {
   // Run daily at 01:00 AM
-  cron.schedule('0 1 * * *', async () => {
+  cron.schedule('0 * * * *', async () => {
     console.log('⏰ Warranty Alert Job: Running daily check...');
     try {
       const thirtyDaysFromNow = new Date();
@@ -25,7 +28,7 @@ export const startWarrantyJob = () => {
       for (const warranty of expiringWarranties) {
         warranty.alertSent = true;
         
-        // Update warranty status to expired if the date is passed (just as double-check)
+        // Update warranty status to expired if the date is passed
         if (warranty.endDate < today) {
           warranty.status = 'expired';
         }
@@ -39,6 +42,29 @@ export const startWarrantyJob = () => {
         console.log(
           `🔔 ALERT: Warranty for asset "${assetName}" (${assetCode}) expires on ${warranty.endDate.toISOString().split('T')[0]}. Provider: ${warranty.provider}`
         );
+
+        // Provision in-app notification alerts for org_admin and asset_manager users
+        if (warranty.organizationId) {
+          try {
+            await runWithTenant(warranty.organizationId.toString(), async () => {
+              const staffAdmins = await User.find({
+                role: { $in: ['org_admin', 'asset_manager'] }
+              });
+
+              for (const admin of staffAdmins) {
+                await Notification.create({
+                  organizationId: warranty.organizationId,
+                  userId: admin._id,
+                  message: `Warranty for asset "${assetName}" (${assetCode}) expires on ${warranty.endDate.toISOString().split('T')[0]}. Provider: ${warranty.provider}`,
+                  type: 'warranty_expiring',
+                  relatedId: warranty._id
+                });
+              }
+            });
+          } catch (err) {
+            console.error(`❌ Failed to write notification for org ${warranty.organizationId}:`, err.message);
+          }
+        }
       }
     } catch (error) {
       console.error('❌ Warranty Alert Job failed:', error.message);

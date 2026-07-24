@@ -163,6 +163,8 @@ console.log("Organization:", org);
       healthScore: initialAiResult.healthScore,
       insights: initialAiResult.insights,
       lastAnalyzedAt: initialAiResult.lastAnalyzedAt,
+      predictedNextMaintenanceDate: initialAiResult.predictedNextMaintenanceDate || null,
+      failureRiskPercent: initialAiResult.failureRiskPercent || 0,
     };
 
     await asset.save();
@@ -238,6 +240,7 @@ export const assignAsset = async (req, res, next) => {
 
     // Log Asset Assignment
     const log = await AssetAssignment.create({
+      organizationId: req.orgId,
       assetId: asset._id,
       employeeId,
       assignedBy: req.user._id,

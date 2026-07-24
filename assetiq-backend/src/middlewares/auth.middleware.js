@@ -3,14 +3,7 @@ import { env } from '../config/env.js';
 import { User } from '../models/User.js';
 
 export const protect = async (req, res, next) => {
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    token = req.headers.authorization.split(' ')[1];
-  }
+  const token = req.cookies?.accessToken;
 
   if (!token) {
     return res.status(401).json({

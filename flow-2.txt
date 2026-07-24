@@ -1,0 +1,7 @@
+Entry point — server.js → app.js. How does the server start, and what does Express wire up first (middleware order matters a lot).
+Middleware layer — auth.middleware.js, tenant.middleware.js, rbac.middleware.js, error.middleware.js. What runs before a request even hits your controller.
+Routing — pick one flow, e.g. auth.route.js → login. See how a route maps to a controller function.
+Controller — auth.controller.js. The actual logic: what it reads from the request, what it calls next.
+Model / DB layer — User.js, tenantScope.plugin.js. How data actually gets read/written to MongoDB, and how multi-tenancy (organizationId scoping) is enforced at this layer.
+Back up to response — how the controller sends data back, via apiResponse.js / asyncHandler.js.
+Frontend side — AuthContext.jsx → how React calls that same endpoint, stores the token/session, and how Login.jsx / Dashboard.jsx react to it.

@@ -16,6 +16,8 @@ export const recomputeHealthScore = async (req, res, next) => {
       healthScore: analysis.healthScore,
       insights: analysis.insights,
       lastAnalyzedAt: analysis.lastAnalyzedAt,
+      predictedNextMaintenanceDate: analysis.predictedNextMaintenanceDate || null,
+      failureRiskPercent: analysis.failureRiskPercent || 0,
     };
 
     await asset.save();

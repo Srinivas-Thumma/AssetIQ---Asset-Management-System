@@ -7,7 +7,11 @@ import { sendResponse } from '../utils/apiResponse.js';
 
 export const getAssetSummaryReport = async (req, res, next) => {
   try {
-    const assets = await Asset.find();
+    const filter = {};
+    if (req.user.role === 'employee') {
+      filter.assignedTo = req.user.employeeRef;
+    }
+    const assets = await Asset.find(filter);
     
     const summary = {
       total: assets.length,

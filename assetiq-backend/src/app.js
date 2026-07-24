@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 
@@ -15,14 +16,16 @@ import warrantyRouter from './routes/warranty.route.js';
 import aiRouter from './routes/ai.route.js';
 import reportsRouter from './routes/reports.route.js';
 import adminRouter from './routes/admin.route.js';
+import notificationRouter from './routes/notification.route.js';
 
 const app = express();
 
 // Middlewares
 app.use(cors({
-  origin: '*', // Allow all client queries during local development
+  origin: 'http://localhost:5173', // Credentials cookie requires exact origin
   credentials: true
 }));
+app.use(cookieParser());
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -69,6 +72,7 @@ app.use('/api/v1/warranties', warrantyRouter);
 app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/notifications', notificationRouter);
 
 // Global Error Handler
 app.use(errorHandler);

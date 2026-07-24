@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Building2, Tag, Users, Contact, Plus, RefreshCw, 
-  Mail, Phone, MapPin, Hash, Briefcase, Key, ShieldAlert 
+  Mail, Phone, MapPin, Hash, Briefcase, Key, ShieldAlert, Edit2, Trash2, X 
 } from 'lucide-react';
 
 export default function OrganizationSetup() {
-  const { apiCall } = useAuth();
+  const { apiCall, user } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState('departments');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -21,6 +21,9 @@ export default function OrganizationSetup() {
   // Form submits state
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Editing state
+  const [editId, setEditId] = useState('');
 
   // Form states
   const [deptForm, setDeptForm] = useState({ name: '', code: '' });
@@ -63,20 +66,80 @@ export default function OrganizationSetup() {
     fetchData();
   }, []);
 
+  const handleCancelEdit = () => {
+    setEditId('');
+    setDeptForm({ name: '', code: '' });
+    setCatForm({ name: '', code: '' });
+    setVendorForm({ name: '', contactEmail: '', phone: '', address: '' });
+    setEmployeeForm({ name: '', employeeId: '', email: '', departmentId: '' });
+    setCreateAccount(false);
+    setUserPassword('password123');
+    setUserRole('employee');
+    setError('');
+  };
+
+  const handleEditInit = (type, item) => {
+    setError('');
+    setEditId(item._id);
+    if (type === 'departments') {
+      setDeptForm({ name: item.name, code: item.code });
+    } else if (type === 'categories') {
+      setCatForm({ name: item.name, code: item.code });
+    } else if (type === 'vendors') {
+      setVendorForm({ 
+        name: item.name, 
+        contactEmail: item.contactEmail || '', 
+        phone: item.phone || '', 
+        address: item.address || '' 
+      });
+    } else if (type === 'employees') {
+      setEmployeeForm({ 
+        name: item.name, 
+        employeeId: item.employeeId, 
+        email: item.email, 
+        departmentId: item.departmentId?._id || item.departmentId || '' 
+      });
+      setCreateAccount(false); // Can't add login account via edit employee
+    }
+  };
+
+  const handleDelete = async (type, id) => {
+    if (!window.confirm(`Are you sure you want to delete this ${type.slice(0,-1)}? This cannot be undone.`)) return;
+    setRefreshing(true);
+    setError('');
+    try {
+      const res = await apiCall(`/api/v1/lookups/${type}/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.success) {
+        fetchData();
+      } else {
+        setError(res.message || `Failed to delete from ${type}`);
+      }
+    } catch (err) {
+      setError('A connection issue occurred.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleAddDepartment = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
+    const method = editId ? 'PUT' : 'POST';
+    const url = editId ? `/api/v1/lookups/departments/${editId}` : '/api/v1/lookups/departments';
+    
     try {
-      const res = await apiCall('/api/v1/lookups/departments', {
-        method: 'POST',
+      const res = await apiCall(url, {
+        method,
         body: JSON.stringify(deptForm)
       });
       if (res.success) {
-        setDeptForm({ name: '', code: '' });
+        handleCancelEdit();
         fetchData();
       } else {
-        setError(res.message || 'Failed to create department');
+        setError(res.message || 'Failed to submit department');
       }
     } catch (err) {
       setError('Connection failure.');
@@ -89,16 +152,19 @@ export default function OrganizationSetup() {
     e.preventDefault();
     setSubmitting(true);
     setError('');
+    const method = editId ? 'PUT' : 'POST';
+    const url = editId ? `/api/v1/lookups/categories/${editId}` : '/api/v1/lookups/categories';
+    
     try {
-      const res = await apiCall('/api/v1/lookups/categories', {
-        method: 'POST',
+      const res = await apiCall(url, {
+        method,
         body: JSON.stringify(catForm)
       });
       if (res.success) {
-        setCatForm({ name: '', code: '' });
+        handleCancelEdit();
         fetchData();
       } else {
-        setError(res.message || 'Failed to create category');
+        setError(res.message || 'Failed to submit category');
       }
     } catch (err) {
       setError('Connection failure.');
@@ -111,16 +177,19 @@ export default function OrganizationSetup() {
     e.preventDefault();
     setSubmitting(true);
     setError('');
+    const method = editId ? 'PUT' : 'POST';
+    const url = editId ? `/api/v1/lookups/vendors/${editId}` : '/api/v1/lookups/vendors';
+    
     try {
-      const res = await apiCall('/api/v1/lookups/vendors', {
-        method: 'POST',
+      const res = await apiCall(url, {
+        method,
         body: JSON.stringify(vendorForm)
       });
       if (res.success) {
-        setVendorForm({ name: '', contactEmail: '', phone: '', address: '' });
+        handleCancelEdit();
         fetchData();
       } else {
-        setError(res.message || 'Failed to create vendor');
+        setError(res.message || 'Failed to submit vendor');
       }
     } catch (err) {
       setError('Connection failure.');
@@ -136,8 +205,14 @@ export default function OrganizationSetup() {
     
     try {
       let res;
-      if (createAccount) {
-        // Create BOTH Employee Profile AND User Login Credentials
+      if (editId) {
+        // Edit Employee Profile ONLY (PUT)
+        res = await apiCall(`/api/v1/lookups/employees/${editId}`, {
+          method: 'PUT',
+          body: JSON.stringify(employeeForm)
+        });
+      } else if (createAccount) {
+        // Create BOTH Employee Profile AND User Login Credentials (POST)
         res = await apiCall('/api/v1/auth/users', {
           method: 'POST',
           body: JSON.stringify({
@@ -149,7 +224,7 @@ export default function OrganizationSetup() {
           })
         });
       } else {
-        // Create Employee Profile ONLY
+        // Create Employee Profile ONLY (POST)
         res = await apiCall('/api/v1/lookups/employees', {
           method: 'POST',
           body: JSON.stringify(employeeForm)
@@ -157,10 +232,7 @@ export default function OrganizationSetup() {
       }
 
       if (res.success) {
-        setEmployeeForm({ name: '', employeeId: '', email: '', departmentId: '' });
-        setCreateAccount(false);
-        setUserPassword('password123');
-        setUserRole('employee');
+        handleCancelEdit();
         fetchData();
       } else {
         setError(res.message || 'Failed to register employee');
@@ -206,7 +278,7 @@ export default function OrganizationSetup() {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-semibold">
+        <div className="p-4 bg-red-55 border border-red-200 text-red-700 rounded-2xl text-sm font-semibold animate-fade-in">
           {error}
         </div>
       )}
@@ -221,7 +293,7 @@ export default function OrganizationSetup() {
               key={tab.id}
               onClick={() => {
                 setActiveSubTab(tab.id);
-                setError('');
+                handleCancelEdit();
               }}
               className={`flex items-center gap-2 pb-4 text-sm font-bold border-b-2 transition-all cursor-pointer ${
                 isActive 
@@ -250,6 +322,7 @@ export default function OrganizationSetup() {
                   <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                     <th className="py-4 px-6">Department Name</th>
                     <th className="py-4 px-6">System Code</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
@@ -257,10 +330,26 @@ export default function OrganizationSetup() {
                     <tr key={dept._id} className="hover:bg-slate-50/50">
                       <td className="py-4 px-6 font-semibold">{dept.name}</td>
                       <td className="py-4 px-6 font-mono font-bold text-slate-500">{dept.code}</td>
+                      <td className="py-4 px-6 text-right space-x-2 shrink-0">
+                        <button
+                          onClick={() => handleEditInit('departments', dept)}
+                          className="inline-flex p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded-lg cursor-pointer"
+                          title="Edit"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete('departments', dept._id)}
+                          className="inline-flex p-1 text-slate-400 hover:text-red-600 hover:bg-slate-50 rounded-lg cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {departments.length === 0 && (
-                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="2">No departments registered.</td></tr>
+                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="3">No departments registered.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -275,6 +364,7 @@ export default function OrganizationSetup() {
                   <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                     <th className="py-4 px-6">Category Name</th>
                     <th className="py-4 px-6">System Code</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
@@ -282,10 +372,26 @@ export default function OrganizationSetup() {
                     <tr key={cat._id} className="hover:bg-slate-50/50">
                       <td className="py-4 px-6 font-semibold">{cat.name}</td>
                       <td className="py-4 px-6 font-mono font-bold text-slate-500">{cat.code}</td>
+                      <td className="py-4 px-6 text-right space-x-2">
+                        <button
+                          onClick={() => handleEditInit('categories', cat)}
+                          className="inline-flex p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded-lg cursor-pointer"
+                          title="Edit"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete('categories', cat._id)}
+                          className="inline-flex p-1 text-slate-400 hover:text-red-600 hover:bg-slate-50 rounded-lg cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {categories.length === 0 && (
-                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="2">No categories registered.</td></tr>
+                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="3">No categories registered.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -301,6 +407,7 @@ export default function OrganizationSetup() {
                     <th className="py-4 px-6">Supplier Name</th>
                     <th className="py-4 px-6">Email / Phone</th>
                     <th className="py-4 px-6">Address</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
@@ -311,11 +418,27 @@ export default function OrganizationSetup() {
                         <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> {vend.contactEmail || 'N/A'}</div>
                         <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {vend.phone || 'N/A'}</div>
                       </td>
-                      <td className="py-4 px-6 text-xs text-slate-500 truncate max-w-[180px]">{vend.address || 'N/A'}</td>
+                      <td className="py-4 px-6 text-xs text-slate-500 truncate max-w-[150px]">{vend.address || 'N/A'}</td>
+                      <td className="py-4 px-6 text-right space-x-2">
+                        <button
+                          onClick={() => handleEditInit('vendors', vend)}
+                          className="inline-flex p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded-lg cursor-pointer"
+                          title="Edit"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete('vendors', vend._id)}
+                          className="inline-flex p-1 text-slate-400 hover:text-red-600 hover:bg-slate-50 rounded-lg cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {vendors.length === 0 && (
-                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="3">No suppliers registered.</td></tr>
+                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="4">No suppliers registered.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -333,6 +456,7 @@ export default function OrganizationSetup() {
                     <th className="py-4 px-6">Corporate Email</th>
                     <th className="py-4 px-6">Department</th>
                     <th className="py-4 px-6">System Access</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
@@ -364,11 +488,27 @@ export default function OrganizationSetup() {
                             <span className="text-slate-400 text-xs italic">No Login Account</span>
                           )}
                         </td>
+                        <td className="py-4 px-6 text-right space-x-2">
+                          <button
+                            onClick={() => handleEditInit('employees', emp)}
+                            className="inline-flex p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded-lg cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete('employees', emp._id)}
+                            className="inline-flex p-1 text-slate-400 hover:text-red-600 hover:bg-slate-50 rounded-lg cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
                   {employees.length === 0 && (
-                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="5">No employees registered.</td></tr>
+                    <tr><td className="py-8 px-6 text-center text-slate-400 italic" colSpan="6">No employees registered.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -379,10 +519,15 @@ export default function OrganizationSetup() {
         {/* Right pane: form */}
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm h-fit">
           
-          {/* Add Department Form */}
+          {/* Add/Edit Department Form */}
           {activeSubTab === 'departments' && (
             <form onSubmit={handleAddDepartment} className="space-y-4">
-              <h3 className="text-md font-bold text-slate-800 mb-2">Create Department</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-md font-bold text-slate-800">{editId ? 'Modify Department' : 'Create Department'}</h3>
+                {editId && (
+                  <button type="button" onClick={handleCancelEdit} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-0.5"><X className="h-3 w-3" /> Cancel</button>
+                )}
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Department Name</label>
                 <input
@@ -408,18 +553,23 @@ export default function OrganizationSetup() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center gap-1.5 cursor-pointer disabled:opacity-50 animate-fade-in"
               >
-                <Plus className="h-4 w-4" />
-                Add Department
+                {editId ? <Edit2 className="h-3.5 w-3.5" /> : <Plus className="h-4 w-4" />}
+                {editId ? 'Update Department' : 'Add Department'}
               </button>
             </form>
           )}
 
-          {/* Add Category Form */}
+          {/* Add/Edit Category Form */}
           {activeSubTab === 'categories' && (
             <form onSubmit={handleAddCategory} className="space-y-4">
-              <h3 className="text-md font-bold text-slate-800 mb-2">Create Category</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-md font-bold text-slate-800">{editId ? 'Modify Category' : 'Create Category'}</h3>
+                {editId && (
+                  <button type="button" onClick={handleCancelEdit} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-0.5"><X className="h-3 w-3" /> Cancel</button>
+                )}
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Category Name</label>
                 <input
@@ -445,18 +595,23 @@ export default function OrganizationSetup() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center gap-1.5 cursor-pointer disabled:opacity-50 animate-fade-in"
               >
-                <Plus className="h-4 w-4" />
-                Add Category
+                {editId ? <Edit2 className="h-3.5 w-3.5" /> : <Plus className="h-4 w-4" />}
+                {editId ? 'Update Category' : 'Add Category'}
               </button>
             </form>
           )}
 
-          {/* Add Vendor Form */}
+          {/* Add/Edit Vendor Form */}
           {activeSubTab === 'vendors' && (
             <form onSubmit={handleAddVendor} className="space-y-4">
-              <h3 className="text-md font-bold text-slate-800 mb-2">Register Vendor</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-md font-bold text-slate-800">{editId ? 'Modify Vendor' : 'Register Vendor'}</h3>
+                {editId && (
+                  <button type="button" onClick={handleCancelEdit} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-0.5"><X className="h-3 w-3" /> Cancel</button>
+                )}
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Supplier Name</label>
                 <input
@@ -495,7 +650,7 @@ export default function OrganizationSetup() {
                   placeholder="Street, City, State..."
                   value={vendorForm.address}
                   onChange={(e) => setVendorForm({ ...vendorForm, address: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400 text-xs"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-850 text-sm focus:outline-none focus:border-slate-400 text-xs"
                 />
               </div>
               <button
@@ -503,16 +658,21 @@ export default function OrganizationSetup() {
                 disabled={submitting}
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center gap-1.5 cursor-pointer disabled:opacity-50 animate-fade-in"
               >
-                <Plus className="h-4 w-4" />
-                Register Vendor
+                {editId ? <Edit2 className="h-3.5 w-3.5" /> : <Plus className="h-4 w-4" />}
+                {editId ? 'Update Vendor' : 'Register Vendor'}
               </button>
             </form>
           )}
 
-          {/* Add Employee Form */}
+          {/* Add/Edit Employee Form */}
           {activeSubTab === 'employees' && (
             <form onSubmit={handleAddEmployee} className="space-y-4">
-              <h3 className="text-md font-bold text-slate-800 mb-2">Register Employee</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-md font-bold text-slate-800">{editId ? 'Modify Employee' : 'Register Employee'}</h3>
+                {editId && (
+                  <button type="button" onClick={handleCancelEdit} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-0.5"><X className="h-3 w-3" /> Cancel</button>
+                )}
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Full Name</label>
                 <input
@@ -536,19 +696,17 @@ export default function OrganizationSetup() {
                 />
               </div>
               
-              {!createAccount && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Employee ID (Unique)</label>
-                  <input
-                    type="text"
-                    required={!createAccount}
-                    placeholder="e.g. EMP-102"
-                    value={employeeForm.employeeId}
-                    onChange={(e) => setEmployeeForm({ ...employeeForm, employeeId: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400 font-mono"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Employee ID (Unique)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. EMP-102"
+                  value={employeeForm.employeeId}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, employeeId: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400 font-mono"
+                />
+              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 font-sans">Department</label>
@@ -568,53 +726,55 @@ export default function OrganizationSetup() {
                 )}
               </div>
 
-              {/* Login Account Provision Option */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-3.5">
-                <label className="flex items-center gap-2.5 cursor-pointer text-slate-700 select-none">
-                  <input
-                    type="checkbox"
-                    checked={createAccount}
-                    onChange={(e) => setCreateAccount(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-xs font-bold">Create System Login Account</span>
-                </label>
+              {/* Login Account Provision Option (Disabled on Edit Employee) */}
+              {!editId && (
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-3.5 animate-fade-in">
+                  <label className="flex items-center gap-2.5 cursor-pointer text-slate-700 select-none">
+                    <input
+                      type="checkbox"
+                      checked={createAccount}
+                      onChange={(e) => setCreateAccount(e.target.checked)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-xs font-bold">Create System Login Account</span>
+                  </label>
 
-                {createAccount && (
-                  <div className="space-y-3 pt-2 border-t border-slate-200/50 animate-fade-in">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Access Role Level</label>
-                      <select
-                        value={userRole}
-                        onChange={(e) => setUserRole(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-xs font-semibold text-slate-705 focus:outline-none"
-                      >
-                        <option value="employee">Employee (Read-only own assets)</option>
-                        <option value="asset_manager">Asset Manager (Manage inventories)</option>
-                      </select>
+                  {createAccount && (
+                    <div className="space-y-3 pt-2 border-t border-slate-200/50 animate-fade-in">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Access Role Level</label>
+                        <select
+                          value={userRole}
+                          onChange={(e) => setUserRole(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-xs font-semibold text-slate-705 focus:outline-none"
+                        >
+                          <option value="employee">Employee (Read-only own assets)</option>
+                          <option value="asset_manager">Asset Manager (Manage inventories)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Access Password</label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="Default password"
+                          value={userPassword}
+                          onChange={(e) => setUserPassword(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs text-slate-800 focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Access Password</label>
-                      <input
-                        type="password"
-                        required
-                        placeholder="Default password"
-                        value={userPassword}
-                        onChange={(e) => setUserPassword(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs text-slate-800 focus:outline-none focus:border-slate-400"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               <button
                 type="submit"
                 disabled={submitting || departments.length === 0}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center gap-1.5 cursor-pointer disabled:opacity-50 animate-fade-in"
               >
-                <Plus className="h-4 w-4" />
-                {createAccount ? 'Provision User Account' : 'Register Employee'}
+                {editId ? <Edit2 className="h-3.5 w-3.5" /> : <Plus className="h-4 w-4" />}
+                {editId ? 'Update Employee' : (createAccount ? 'Provision User Account' : 'Register Employee')}
               </button>
             </form>
           )}

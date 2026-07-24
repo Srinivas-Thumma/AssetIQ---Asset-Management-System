@@ -37,6 +37,7 @@ export const createMaintenanceRequest = async (req, res, next) => {
     await asset.save();
 
     const request = await MaintenanceRequest.create({
+      organizationId: req.orgId,
       assetId,
       raisedBy: req.user._id,
       type,
@@ -106,6 +107,7 @@ export const completeMaintenance = async (req, res, next) => {
 
     // 2. Create Maintenance History Entry
     const history = await MaintenanceHistory.create({
+      organizationId: req.orgId,
       assetId: request.assetId,
       requestId: request._id,
       date: new Date(),
@@ -128,6 +130,8 @@ export const completeMaintenance = async (req, res, next) => {
         healthScore: analysis.healthScore,
         insights: analysis.insights,
         lastAnalyzedAt: analysis.lastAnalyzedAt,
+        predictedNextMaintenanceDate: analysis.predictedNextMaintenanceDate || null,
+        failureRiskPercent: analysis.failureRiskPercent || 0,
       };
       await asset.save();
     }

@@ -1,21 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Package, CheckCircle2, AlertTriangle, Activity, RefreshCw } from 'lucide-react';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Package, CheckCircle2, Activity, RefreshCw, Wrench } from 'lucide-react';
 
-export default function Dashboard() {
-  const { apiCall } = useAuth();
+export default function Dashboard({ onNavigate }) {
+  const { apiCall, user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [warranties, setWarranties] = useState([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDashboardStats = async () => {
     setRefreshing(true);
     try {
-      const res = await apiCall('/api/v1/reports/asset-summary');
-      if (res.success) {
-        setStats(res.data);
-      }
+      const [statsRes, warrantiesRes, maintenanceRes] = await Promise.all([
+        apiCall('/api/v1/reports/asset-summary'),
+        apiCall('/api/v1/warranties'),
+        apiCall('/api/v1/maintenance')
+      ]);
+
+      if (statsRes.success) setStats(statsRes.data);
+      if (warrantiesRes.success) setWarranties(warrantiesRes.data || []);
+      if (maintenanceRes.success) setMaintenanceRequests(maintenanceRes.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -28,6 +35,50 @@ export default function Dashboard() {
     fetchDashboardStats();
   }, []);
 
+  const getDashboardTitle = () => {
+    switch (user?.role) {
+      case 'super_admin': return 'Super Admin Dashboard';
+      case 'org_admin': return 'Organization Admin Dashboard';
+      case 'asset_manager': return 'Asset Manager Dashboard';
+      case 'employee': return 'Employee Dashboard';
+      default: return 'Executive Dashboard';
+    }
+  };
+
+  const getWarrantyData = () => {
+    const buckets = {};
+    const now = new Date();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      buckets[key] = 0;
+    }
+    warranties.forEach(w => {
+      const d = new Date(w.endDate);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (key in buckets) buckets[key]++;
+    });
+    return Object.entries(buckets).map(([month, count]) => {
+      const [year, monthNum] = month.split('-');
+      const date = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+      const formattedMonth = date.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+      return { month: formattedMonth, count };
+    });
+  };
+
+  const getMaintenanceData = () => {
+    const statusCounts = { open: 0, assigned: 0, in_progress: 0, resolved: 0 };
+    maintenanceRequests.forEach(r => {
+      if (r.status in statusCounts) {
+        statusCounts[r.status]++;
+      }
+    });
+    return Object.entries(statusCounts).map(([status, count]) => {
+      const formattedStatus = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
+      return { status: formattedStatus, count };
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -38,25 +89,20 @@ export default function Dashboard() {
 
   // Formatting datasets for Recharts
   const statusData = stats ? [
-    { name: 'Available', value: stats.available, color: '#10b981' }, // Emerald
-    { name: 'Assigned', value: stats.assigned, color: '#3b82f6' }, // Blue
-    { name: 'In Repair', value: stats.under_maintenance, color: '#f59e0b' }, // Amber
-    { name: 'Damaged', value: stats.damaged, color: '#ef4444' }, // Red
+    { name: 'Available', value: stats.available, color: '#6c3ce9' }, 
+    { name: 'Assigned', value: stats.assigned, color: '#8c56ff' }, 
+    { name: 'In Repair', value: stats.under_maintenance, color: '#af8cff' }, 
+    { name: 'Damaged', value: stats.damaged, color: '#d0baff' }, 
   ].filter(d => d.value > 0) : [];
 
-  const barData = stats ? [
-    { name: 'Total', count: stats.total },
-    { name: 'Available', count: stats.available },
-    { name: 'Assigned', count: stats.assigned },
-    { name: 'In Repair', count: stats.under_maintenance },
-    { name: 'Damaged', count: stats.damaged },
-  ] : [];
+  const lineData = getWarrantyData();
+  const barData = getMaintenanceData();
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Executive Dashboard</h1>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{getDashboardTitle()}</h1>
           <p className="text-slate-500 mt-1">Real-time tenant asset metrics and AI health scores.</p>
         </div>
         <button
@@ -93,19 +139,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Maintenance / Issues */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Active Repairs / Damage</span>
-            <span className="text-4xl font-extrabold text-amber-500 mt-2 block">
-              {((stats?.under_maintenance || 0) + (stats?.damaged || 0))}
-            </span>
-          </div>
-          <div className="p-4 bg-amber-50 rounded-xl text-amber-500">
-            <AlertTriangle className="h-6 w-6" />
-          </div>
-        </div>
-
         {/* Average AI Health Score */}
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex items-center justify-between">
           <div>
@@ -116,25 +149,39 @@ export default function Dashboard() {
             <Activity className="h-6 w-6" />
           </div>
         </div>
+
+        {/* Open Maintenance Requests */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Open Maintenance</span>
+            <span className="text-4xl font-extrabold text-indigo-650 mt-2 block">{stats?.under_maintenance || 0}</span>
+          </div>
+          <div className="p-4 bg-indigo-50 rounded-xl text-indigo-600">
+            <Wrench className="h-6 w-6" />
+          </div>
+        </div>
       </div>
 
-      {/* Visual Analytics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Status Distribution (Pie) */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col">
-          <h2 className="text-lg font-bold text-slate-800 mb-4">Asset Status Allocation</h2>
+      {/* Visual Analytics Row: 3-Across Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Widget 1: Status Distribution (Pie) */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-between min-h-[350px]">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Asset Status Allocation</h2>
+            <span className="text-xs text-slate-400">Current status of fleet inventory</span>
+          </div>
           {statusData.length > 0 ? (
-            <div className="h-64 flex items-center justify-center">
-              <div className="w-1/2 h-full">
+            <div className="flex-1 flex flex-col justify-center space-y-4 my-2">
+              <div className="h-40">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={statusData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
+                      innerRadius={45}
+                      outerRadius={65}
+                      paddingAngle={4}
                       dataKey="value"
                     >
                       {statusData.map((entry, index) => (
@@ -145,42 +192,65 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="w-1/2 space-y-3 pl-4">
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-650">
                 {statusData.map((entry, idx) => (
-                  <div key={idx} className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                    <span className="font-medium">{entry.name}:</span>
-                    <span className="font-semibold text-slate-900">{entry.value}</span>
+                  <div key={idx} className="flex items-center gap-1.5 truncate">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                    <span className="font-semibold truncate">{entry.name}:</span>
+                    <span className="font-bold text-slate-800">{entry.value}</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">
-              No asset status data available. Add assets to see visual breakdown.
+            <div className="flex-1 flex items-center justify-center text-slate-400 text-xs italic">
+              No status data available.
             </div>
           )}
         </div>
 
-        {/* Asset Counts (Bar) */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-800 mb-4">Inventory Metrics</h2>
-          {stats?.total > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData}>
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} />
-                  <Tooltip cursor={{ fill: '#f8fafc' }} />
-                  <Bar dataKey="count" fill="#475569" radius={[4, 4, 0, 0]} barSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">
-              No inventory metrics available.
-            </div>
-          )}
+        {/* Widget 2: Warranty Expirations (Line) */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-between min-h-[350px]">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Warranty Expirations</h2>
+            <span className="text-xs text-slate-400">Coverage lapses over next 6 months</span>
+          </div>
+          <div className="flex-1 h-44 my-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={lineData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e1ed" />
+                <XAxis dataKey="month" stroke="#77698f" fontSize={10} tickLine={false} />
+                <YAxis stroke="#77698f" fontSize={10} tickLine={false} allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="#6c3ce9" strokeWidth={2.5} activeDot={{ r: 6 }} dot={{ strokeWidth: 2 }} name="Expirations" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-center text-[10px] text-slate-450 font-semibold border-t border-slate-100 pt-2 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => onNavigate && onNavigate('warranties')}>
+            View All Warranty Records &rarr;
+          </div>
+        </div>
+
+        {/* Widget 3: Maintenance Workload by Status (Bar) */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-between min-h-[350px]">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Maintenance Workload</h2>
+            <span className="text-xs text-slate-400">Request queues sorted by queue status</span>
+          </div>
+          <div className="flex-1 h-44 my-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e1ed" />
+                <XAxis dataKey="status" stroke="#77698f" fontSize={10} tickLine={false} />
+                <YAxis stroke="#77698f" fontSize={10} tickLine={false} allowDecimals={false} />
+                <Tooltip cursor={{ fill: '#f5f3f7' }} />
+                <Bar dataKey="count" fill="#8c56ff" radius={[3, 3, 0, 0]} barSize={24} name="Requests" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-center text-[10px] text-slate-450 font-semibold border-t border-slate-100 pt-2 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => onNavigate && onNavigate('maintenance')}>
+            Manage Servicing Workflows &rarr;
+          </div>
         </div>
       </div>
     </div>

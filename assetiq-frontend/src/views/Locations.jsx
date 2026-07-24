@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { GitCommit, Building2, Layers, MapPin, Plus, RefreshCw, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { 
+  GitCommit, Building2, Layers, MapPin, Plus, 
+  RefreshCw, X, ChevronDown, ChevronRight, Edit2, Trash2 
+} from 'lucide-react';
 
 export default function Locations() {
   const { apiCall, user } = useAuth();
@@ -12,9 +15,10 @@ export default function Locations() {
   const [expandedNodes, setExpandedNodes] = useState({});
 
   // Modal controls
-  const [activeModal, setActiveModal] = useState(null); // 'branch' | 'building' | 'floor' | 'room' | null
+  const [activeModal, setActiveModal] = useState(null); // 'branch'|'building'|'floor'|'room'|'edit_branch'|'edit_building'|'edit_floor'|'edit_room'
   const [parentId, setParentId] = useState('');
   const [parentName, setParentName] = useState('');
+  const [editId, setEditId] = useState('');
   
   // Form values
   const [formData, setFormData] = useState({ name: '', code: '', number: 0 });
@@ -49,8 +53,46 @@ export default function Locations() {
     setFormError('');
     setParentId(parentIdVal);
     setParentName(parentNameVal);
+    setEditId('');
     setFormData({ name: '', code: '', number: 0 });
     setActiveModal(type);
+  };
+
+  const handleOpenEditModal = (type, item) => {
+    if (user?.role === 'employee') return;
+    setFormError('');
+    setParentId('');
+    setParentName('');
+    setEditId(item._id);
+    setFormData({
+      name: item.name,
+      code: item.code || '',
+      number: item.number || 0
+    });
+    setActiveModal(`edit_${type}`);
+  };
+
+  const handleDeleteNode = async (type, id) => {
+    if (user?.role === 'employee') return;
+    if (!window.confirm(`Are you sure you want to delete this ${type}? This action cannot be undone.`)) return;
+
+    setRefreshing(true);
+    try {
+      const res = await apiCall(`/api/v1/locations/${type}s/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (res.success) {
+        fetchTree();
+      } else {
+        alert(res.message || `Failed to delete ${type}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('A network error occurred.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -59,25 +101,36 @@ export default function Locations() {
     setSubmitting(true);
 
     let url = '';
+    let method = 'POST';
     let body = {};
 
-    if (activeModal === 'branch') {
-      url = '/api/v1/locations/branches';
-      body = { name: formData.name, code: formData.code };
-    } else if (activeModal === 'building') {
-      url = '/api/v1/locations/buildings';
-      body = { branchId: parentId, name: formData.name, code: formData.code };
-    } else if (activeModal === 'floor') {
-      url = '/api/v1/locations/floors';
-      body = { buildingId: parentId, name: formData.name, number: Number(formData.number) };
-    } else if (activeModal === 'room') {
-      url = '/api/v1/locations/rooms';
-      body = { floorId: parentId, name: formData.name, code: formData.code };
+    const isEdit = activeModal.startsWith('edit_');
+    const type = isEdit ? activeModal.replace('edit_', '') : activeModal;
+
+    if (isEdit) {
+      method = 'PUT';
+      url = `/api/v1/locations/${type}s/${editId}`;
+      if (type === 'floor') {
+        body = { name: formData.name, number: Number(formData.number) };
+      } else {
+        body = { name: formData.name, code: formData.code };
+      }
+    } else {
+      url = `/api/v1/locations/${type}s`;
+      if (type === 'branch') {
+        body = { name: formData.name, code: formData.code };
+      } else if (type === 'building') {
+        body = { branchId: parentId, name: formData.name, code: formData.code };
+      } else if (type === 'floor') {
+        body = { buildingId: parentId, name: formData.name, number: Number(formData.number) };
+      } else if (type === 'room') {
+        body = { floorId: parentId, name: formData.name, code: formData.code };
+      }
     }
 
     try {
       const res = await apiCall(url, {
-        method: 'POST',
+        method,
         body: JSON.stringify(body),
       });
 
@@ -85,7 +138,7 @@ export default function Locations() {
         setActiveModal(null);
         fetchTree();
       } else {
-        setFormError(res.message || 'Failed to add node');
+        setFormError(res.message || 'Action failed');
       }
     } catch (err) {
       setFormError('Network error occurred.');
@@ -108,7 +161,7 @@ export default function Locations() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Location Hierarchy</h1>
-          <p className="text-slate-500 mt-1">Configure spatial relationships for your organization assets.</p>
+          <p className="text-slate-500 mt-1">Configure branches, buildings, floors, and rooms for asset maps.</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -143,26 +196,43 @@ export default function Locations() {
               const isBranchExpanded = expandedNodes[branch._id];
               return (
                 <div key={branch._id} className="border border-slate-100 rounded-xl overflow-hidden shadow-xs">
+                  
                   {/* Branch Row */}
                   <div className="flex justify-between items-center bg-slate-50 px-4 py-3 hover:bg-slate-100/70 transition-colors">
                     <div className="flex items-center gap-3">
                       <button onClick={() => toggleExpand(branch._id)} className="text-slate-500 hover:text-slate-800 cursor-pointer">
                         {isBranchExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                       </button>
-                      <GitCommit className="h-5 w-5 text-blue-600" />
+                      <GitCommit className="h-5 w-5 text-blue-600 animate-pulse" />
                       <div>
                         <span className="font-bold text-slate-800">{branch.name}</span>
-                        <span className="text-xs font-semibold font-mono text-slate-400 ml-2">[{branch.code}]</span>
+                        <span className="text-xs font-semibold font-mono text-slate-450 ml-2">[{branch.code}]</span>
                       </div>
                     </div>
                     {user?.role !== 'employee' && (
-                      <button
-                        onClick={() => handleOpenCreateModal('building', branch._id, branch.name)}
-                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 bg-white border border-blue-100 hover:bg-blue-50 px-3 py-1.5 rounded-lg shadow-2xs font-semibold cursor-pointer"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add Building
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleOpenEditModal('branch', branch)}
+                          className="p-1.5 text-slate-550 hover:text-blue-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                          title="Edit Branch"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteNode('branch', branch._id)}
+                          className="p-1.5 text-slate-550 hover:text-red-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                          title="Delete Branch"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenCreateModal('building', branch._id, branch.name)}
+                          className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-750 bg-white border border-blue-100 hover:bg-blue-50/50 px-3 py-1.5 rounded-lg shadow-2xs font-semibold cursor-pointer"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Add Building
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -170,12 +240,13 @@ export default function Locations() {
                   {isBranchExpanded && (
                     <div className="pl-6 pr-4 py-2 bg-white divide-y divide-slate-50">
                       {branch.buildings.length === 0 ? (
-                        <div className="text-xs text-slate-400 italic py-2">No buildings registered. Add one to this branch.</div>
+                        <div className="text-xs text-slate-450 italic py-2">No buildings registered. Add one to this branch.</div>
                       ) : (
                         branch.buildings.map((building) => {
                           const isBuildingExpanded = expandedNodes[building._id];
                           return (
                             <div key={building._id} className="py-2.5">
+                              
                               {/* Building Row */}
                               <div className="flex justify-between items-center hover:bg-slate-50/50 p-1.5 rounded-lg transition-colors">
                                 <div className="flex items-center gap-2">
@@ -187,13 +258,29 @@ export default function Locations() {
                                   <span className="text-[10px] font-mono text-slate-400">({building.code})</span>
                                 </div>
                                 {user?.role !== 'employee' && (
-                                  <button
-                                    onClick={() => handleOpenCreateModal('floor', building._id, building.name)}
-                                    className="flex items-center gap-1 text-[10px] text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-md font-bold cursor-pointer"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                    Add Floor
-                                  </button>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => handleOpenEditModal('building', building)}
+                                      className="p-1 text-slate-400 hover:text-blue-600 rounded-md transition-colors cursor-pointer"
+                                      title="Edit Building"
+                                    >
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteNode('building', building._id)}
+                                      className="p-1 text-slate-400 hover:text-red-600 rounded-md transition-colors cursor-pointer"
+                                      title="Delete Building"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleOpenCreateModal('floor', building._id, building.name)}
+                                      className="flex items-center gap-1 text-[10px] text-indigo-600 hover:text-indigo-750 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-md font-bold cursor-pointer animate-fade-in"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                      Add Floor
+                                    </button>
+                                  </div>
                                 )}
                               </div>
 
@@ -207,6 +294,7 @@ export default function Locations() {
                                       const isFloorExpanded = expandedNodes[floor._id];
                                       return (
                                         <div key={floor._id} className="space-y-1.5">
+                                          
                                           {/* Floor Row */}
                                           <div className="flex justify-between items-center hover:bg-slate-50/50 p-1 rounded-md transition-colors">
                                             <div className="flex items-center gap-2">
@@ -218,13 +306,29 @@ export default function Locations() {
                                               <span className="text-[10px] text-slate-400">(Lvl: {floor.number})</span>
                                             </div>
                                             {user?.role !== 'employee' && (
-                                              <button
-                                                onClick={() => handleOpenCreateModal('room', floor._id, floor.name)}
-                                                className="flex items-center gap-1 text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md font-bold cursor-pointer"
-                                              >
-                                                <Plus className="h-3 w-3" />
-                                                Add Room
-                                              </button>
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  onClick={() => handleOpenEditModal('floor', floor)}
+                                                  className="p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
+                                                  title="Edit Floor"
+                                                >
+                                                  <Edit2 className="h-3 w-3" />
+                                                </button>
+                                                <button
+                                                  onClick={() => handleDeleteNode('floor', floor._id)}
+                                                  className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                                                  title="Delete Floor"
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                </button>
+                                                <button
+                                                  onClick={() => handleOpenCreateModal('room', floor._id, floor.name)}
+                                                  className="flex items-center gap-1 text-[10px] text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md font-bold cursor-pointer"
+                                                >
+                                                  <Plus className="h-3 w-3" />
+                                                  Add Room
+                                                </button>
+                                              </div>
                                             )}
                                           </div>
 
@@ -235,12 +339,32 @@ export default function Locations() {
                                                 <div className="text-[10px] text-slate-400 italic col-span-full">No rooms registered.</div>
                                               ) : (
                                                 floor.rooms.map((room) => (
-                                                  <div key={room._id} className="flex items-center gap-2 bg-slate-50 border border-slate-100 p-2 rounded-xl text-xs text-slate-700">
-                                                    <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                    <div className="overflow-hidden">
-                                                      <span className="font-semibold block truncate">{room.name}</span>
-                                                      <span className="text-[9px] font-mono text-slate-400">{room.code}</span>
+                                                  <div key={room._id} className="group flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-100 p-2 rounded-xl text-xs text-slate-705 transition-colors">
+                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                      <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                                      <div className="overflow-hidden">
+                                                        <span className="font-semibold block truncate">{room.name}</span>
+                                                        <span className="text-[9px] font-mono text-slate-455 block truncate">{room.code}</span>
+                                                      </div>
                                                     </div>
+                                                    {user?.role !== 'employee' && (
+                                                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1.5 shrink-0">
+                                                        <button
+                                                          onClick={() => handleOpenEditModal('room', room)}
+                                                          className="p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
+                                                          title="Edit Room"
+                                                        >
+                                                          <Edit2 className="h-3 w-3" />
+                                                        </button>
+                                                        <button
+                                                          onClick={() => handleDeleteNode('room', room._id)}
+                                                          className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                                                          title="Delete Room"
+                                                        >
+                                                          <Trash2 className="h-3 w-3" />
+                                                        </button>
+                                                      </div>
+                                                    )}
                                                   </div>
                                                 ))
                                               )}
@@ -265,15 +389,17 @@ export default function Locations() {
         )}
       </div>
 
-      {/* --- CREATION MODALS --- */}
+      {/* --- CREATION / EDIT MODALS --- */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800 capitalize">
-                Add {activeModal}
+                {activeModal.startsWith('edit_') 
+                  ? `Edit ${activeModal.replace('edit_', '')}` 
+                  : `Add ${activeModal}`}
               </h3>
-              <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -299,18 +425,14 @@ export default function Locations() {
                 <input
                   type="text"
                   required
-                  placeholder={
-                    activeModal === 'branch' ? 'New York HQ' : 
-                    activeModal === 'building' ? 'Building A' : 
-                    activeModal === 'floor' ? 'First Floor' : 'Server Room'
-                  }
+                  placeholder="e.g. Server Room A"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-850 text-sm focus:outline-none focus:border-slate-400"
                 />
               </div>
 
-              {activeModal !== 'floor' ? (
+              {activeModal !== 'floor' && activeModal !== 'edit_floor' ? (
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
                     System Code
@@ -318,19 +440,16 @@ export default function Locations() {
                   <input
                     type="text"
                     required
-                    placeholder={
-                      activeModal === 'branch' ? 'NY-HQ' : 
-                      activeModal === 'building' ? 'BLD-A' : 'SRV-102'
-                    }
+                    placeholder="e.g. NY-HQ"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400 font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-850 text-sm focus:outline-none focus:border-slate-400 font-mono"
                   />
                 </div>
               ) : (
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                    Floor Number
+                    Floor Level Number
                   </label>
                   <input
                     type="number"
@@ -353,9 +472,9 @@ export default function Locations() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 animate-fade-in"
                 >
-                  {submitting ? 'Adding...' : 'Confirm'}
+                  {submitting ? 'Saving...' : 'Confirm'}
                 </button>
               </div>
             </form>

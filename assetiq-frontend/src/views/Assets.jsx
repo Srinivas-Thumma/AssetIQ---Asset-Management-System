@@ -217,7 +217,7 @@ export default function Assets() {
         {user?.role !== 'employee' && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-500 hover:to-emerald-400 text-white font-semibold py-2.5 px-5 rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98]"
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-2.5 px-5 rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98]"
           >
             <Plus className="h-5 w-5" />
             Register Asset
@@ -594,19 +594,19 @@ export default function Assets() {
               </div>
 
               {/* AI Health Diagnostics Pane */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-inner text-white space-y-4">
+              <div className="bg-white border-2 border-blue-600/25 rounded-2xl p-5 shadow-sm text-slate-800 space-y-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-blue-600/30 rounded-lg text-blue-400">
+                    <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
                       <Activity className="h-4 w-4" />
                     </div>
-                    <span className="text-sm font-semibold tracking-wide text-slate-300">AI Health Diagnostics</span>
+                    <span className="text-sm font-semibold tracking-wide text-slate-700">AI Health Diagnostics</span>
                   </div>
                   {user?.role !== 'employee' && (
                     <button
                       onClick={() => handleTriggerAI(selectedAsset._id)}
                       disabled={actionLoading}
-                      className="text-xs bg-slate-800 hover:bg-slate-700 text-blue-300 font-bold px-3 py-1.5 border border-slate-700 rounded-lg shadow-xs cursor-pointer transition-all disabled:opacity-50"
+                      className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold px-3 py-1.5 border border-blue-100 rounded-lg shadow-xs cursor-pointer transition-all disabled:opacity-50"
                     >
                       {actionLoading ? 'Analyzing...' : 'Recalculate AI'}
                     </button>
@@ -616,24 +616,80 @@ export default function Assets() {
                 <div className="flex items-center gap-6 py-2">
                   <div className="relative flex items-center justify-center">
                     {/* Ring score */}
-                    <div className="text-3xl font-extrabold text-blue-400">{selectedAsset.ai?.healthScore ?? 100}%</div>
+                    <div className="text-3xl font-extrabold text-blue-600">{selectedAsset.ai?.healthScore ?? 100}%</div>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-400 uppercase tracking-wider block font-semibold">Diagnostic Score</span>
-                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider block font-semibold">Diagnostic Score</span>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                       Calculated on-demand or nightly based on age, category metrics, and total repair history.
                     </p>
                   </div>
                 </div>
 
+                {/* AI Predictions */}
+                {selectedAsset.ai?.predictedNextMaintenanceDate && (
+                  <div className="space-y-4 border-t border-slate-100 pt-4 text-xs">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-0.5">Predicted Maintenance</span>
+                        <p className="font-bold text-slate-800">
+                          {new Date(selectedAsset.ai.predictedNextMaintenanceDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-0.5">Failure Risk Probability</span>
+                        <p className={`font-bold ${
+                          selectedAsset.ai.failureRiskPercent > 70 ? 'text-red-650' :
+                          selectedAsset.ai.failureRiskPercent > 40 ? 'text-amber-650' :
+                          'text-emerald-600'
+                        }`}>
+                          {selectedAsset.ai.failureRiskPercent}% Risk
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedAsset.ai.remainingUsefulLifeMonths !== undefined && selectedAsset.ai.remainingUsefulLifeMonths !== null && (
+                        <div>
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-0.5">Remaining Useful Life</span>
+                          <p className="font-bold text-slate-800">
+                            {selectedAsset.ai.remainingUsefulLifeMonths} months
+                          </p>
+                        </div>
+                      )}
+                      {selectedAsset.ai.priority && (
+                        <div>
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-0.5">Urgency Priority</span>
+                          <p className={`font-bold ${
+                            selectedAsset.ai.priority.toLowerCase() === 'critical' || selectedAsset.ai.priority.toLowerCase() === 'high' ? 'text-red-600' :
+                            selectedAsset.ai.priority.toLowerCase() === 'medium' ? 'text-amber-600' :
+                            'text-slate-700'
+                          }`}>
+                            {selectedAsset.ai.priority}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedAsset.ai.replacementRecommendation && (
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-1">Replacement Recommendation</span>
+                        <p className="text-slate-700 leading-relaxed font-medium">
+                          {selectedAsset.ai.replacementRecommendation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Insights List */}
-                <div className="space-y-2 border-t border-slate-800 pt-4">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Insights & Warnings</span>
+                <div className="space-y-2 border-t border-slate-100 pt-4">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Insights & Warnings</span>
                   {selectedAsset.ai?.insights && selectedAsset.ai.insights.length > 0 ? (
                     <ul className="space-y-2.5 mt-2">
                       {selectedAsset.ai.insights.map((insight, idx) => (
-                        <li key={idx} className="flex gap-2 items-start text-xs text-slate-200 leading-relaxed">
-                          <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                        <li key={idx} className="flex gap-2 items-start text-xs text-slate-650 leading-relaxed">
+                          <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-650 shrink-0" />
                           {insight}
                         </li>
                       ))}

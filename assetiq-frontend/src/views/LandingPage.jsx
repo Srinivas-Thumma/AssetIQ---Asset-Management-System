@@ -76,7 +76,7 @@ export default function LandingPage({ onNavigateToLogin, onNavigateToRegister })
       {/* 1. Sticky Navigation */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center max-w-7xl mx-auto rounded-b-2xl shadow-xs">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-gradient-to-tr from-blue-600 to-emerald-500 rounded-lg shadow-sm">
+          <div className="p-1.5 bg-gradient-to-tr from-blue-600 to-blue-400 rounded-lg shadow-sm">
             <ShieldCheck className="h-5 w-5 text-white" />
           </div>
           <span className="text-xl font-bold text-slate-900 tracking-tight">AssetIQ</span>
@@ -112,7 +112,7 @@ export default function LandingPage({ onNavigateToLogin, onNavigateToRegister })
           </span>
           <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight leading-tight">
             Local-First Asset Tracking <br />
-            <span className="bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
               Infused with Explainable AI
             </span>
           </h1>
@@ -122,7 +122,7 @@ export default function LandingPage({ onNavigateToLogin, onNavigateToRegister })
           <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
             <button 
               onClick={onNavigateToRegister}
-              className="bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-500 hover:to-emerald-400 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-blue-500/20 cursor-pointer active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-blue-500/20 cursor-pointer active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               Get Started Free
               <ChevronRight className="h-5 w-5" />
@@ -390,7 +390,7 @@ export default function LandingPage({ onNavigateToLogin, onNavigateToRegister })
           <div className="flex justify-center gap-4 pt-2">
             <button 
               onClick={onNavigateToRegister}
-              className="bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-500 hover:to-emerald-400 text-white font-bold py-3 px-8 rounded-xl cursor-pointer shadow-lg transition-all active:scale-[0.98]"
+              className="bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold py-3 px-8 rounded-xl cursor-pointer shadow-lg transition-all active:scale-[0.98]"
             >
               Get Started Now
             </button>

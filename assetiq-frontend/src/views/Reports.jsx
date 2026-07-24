@@ -104,15 +104,15 @@ export default function Reports() {
               <AreaChart data={costData.monthlyCost}>
                 <defs>
                   <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#6c3ce9" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#6c3ce9" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={11} tickLine={false} unit="$" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e1ed" />
+                <XAxis dataKey="month" stroke="#77698f" fontSize={11} tickLine={false} />
+                <YAxis stroke="#77698f" fontSize={11} tickLine={false} unit="$" />
                 <Tooltip />
-                <Area type="monotone" dataKey="cost" stroke="#f43f5e" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCost)" />
+                <Area type="monotone" dataKey="cost" stroke="#6c3ce9" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCost)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -132,10 +132,10 @@ export default function Reports() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={costData.categoryCost} layout="vertical">
-                  <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} />
-                  <YAxis dataKey="category" type="category" stroke="#64748b" fontSize={11} tickLine={false} width={100} />
+                  <XAxis type="number" stroke="#77698f" fontSize={11} tickLine={false} />
+                  <YAxis dataKey="category" type="category" stroke="#77698f" fontSize={11} tickLine={false} width={100} />
                   <Tooltip />
-                  <Bar dataKey="cost" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="cost" fill="#8c56ff" radius={[0, 4, 4, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -153,10 +153,10 @@ export default function Reports() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={locationData}>
-                  <XAxis dataKey="location" stroke="#64748b" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                  <XAxis dataKey="location" stroke="#77698f" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#77698f" fontSize={11} tickLine={false} />
                   <Tooltip />
-                  <Bar dataKey="assetsCount" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
+                  <Bar dataKey="assetsCount" fill="#af8cff" radius={[4, 4, 0, 0]} barSize={30} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

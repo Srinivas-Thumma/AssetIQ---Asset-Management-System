@@ -40,6 +40,23 @@ const generateTokens = (user) => {
   return { accessToken, refreshToken };
 };
 
+const setAuthCookies = (res, accessToken, refreshToken) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: isProd,           // requires HTTPS in prod; false is fine for localhost http
+    sameSite: 'lax',          // sent on top-level navigation + same-site XHR, blocks basic CSRF vectors
+    maxAge: 24 * 60 * 60 * 1000, // 1 day, matches JWT_ACCESS expiry
+  });
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    path: '/api/v1/auth/refresh', // only ever sent to the refresh endpoint — narrows exposure
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+};
+
 export const register = async (req, res, next) => {
   try {
     const validated = registerSchema.parse(req.body);
@@ -132,6 +149,7 @@ export const register = async (req, res, next) => {
     });
 
     const { accessToken, refreshToken } = generateTokens(result.user);
+    setAuthCookies(res, accessToken, refreshToken);
 
     return sendResponse(res, 201, true, 'Organization and Admin registered successfully', {
       user: {
@@ -141,8 +159,6 @@ export const register = async (req, res, next) => {
         organizationId: result.user.organizationId,
       },
       organization: newOrg,
-      accessToken,
-      refreshToken,
     });
   } catch (error) {
     next(error);
@@ -196,6 +212,7 @@ if (user) {
     }
 
     const { accessToken, refreshToken } = generateTokens(user);
+    setAuthCookies(res, accessToken, refreshToken);
 
     return sendResponse(res, 200, true, 'Logged in successfully', {
       user: {
@@ -204,8 +221,6 @@ if (user) {
         role: user.role,
         organizationId: user.organizationId,
       },
-      accessToken,
-      refreshToken,
     });
   } catch (error) {
     next(error);
@@ -213,7 +228,7 @@ if (user) {
 };
 
 export const refresh = async (req, res, next) => {
-  const { refreshToken } = req.body;
+  const refreshToken = req.cookies.refreshToken;
 
   if (!refreshToken) {
     return sendResponse(res, 400, false, 'Refresh token is required');
@@ -228,14 +243,18 @@ export const refresh = async (req, res, next) => {
     }
 
     const tokens = generateTokens(user);
+    setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
-    return sendResponse(res, 200, true, 'Token refreshed successfully', {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    });
+    return sendResponse(res, 200, true, 'Token refreshed successfully', null);
   } catch (error) {
     return sendResponse(res, 401, false, 'Invalid or expired refresh token');
   }
+};
+
+export const logout = async (req, res, next) => {
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
+  return sendResponse(res, 200, true, 'Logged out successfully', null);
 };
 
 export const createOrgUser = async (req, res, next) => {

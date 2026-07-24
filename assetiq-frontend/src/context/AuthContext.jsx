@@ -6,14 +6,12 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('accessToken') || null);
-  const [refreshToken, setRefreshToken] = useState(localStorage.getItem('refreshToken') || null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize user from token on startup
+  // Initialize non-sensitive user metadata on startup
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
-    if (savedUser && token) {
+    if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
       } catch (e) {
@@ -21,7 +19,7 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setLoading(false);
-  }, [token]);
+  }, []);
 
   const login = async (email, password) => {
     try {
@@ -36,14 +34,10 @@ export const AuthProvider = ({ children }) => {
         throw new Error(resData.message || 'Login failed');
       }
 
-      const { accessToken, refreshToken: refToken, user: userData } = resData.data;
+      const { user: userData } = resData.data;
 
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refToken);
+      // Persist only non-sensitive metadata for page renders, tokens remain in HttpOnly cookies
       localStorage.setItem('user', JSON.stringify(userData));
-
-      setToken(accessToken);
-      setRefreshToken(refToken);
       setUser(userData);
 
       return { success: true };
@@ -65,14 +59,9 @@ export const AuthProvider = ({ children }) => {
         throw new Error(resData.message || 'Registration failed');
       }
 
-      const { accessToken, refreshToken: refToken, user: userData } = resData.data;
+      const { user: userData } = resData.data;
 
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refToken);
       localStorage.setItem('user', JSON.stringify(userData));
-
-      setToken(accessToken);
-      setRefreshToken(refToken);
       setUser(userData);
 
       return { success: true };
@@ -81,26 +70,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch (err) {
+      console.warn('Backend logout failed:', err.message);
+    }
     localStorage.clear();
-    setToken(null);
-    setRefreshToken(null);
     setUser(null);
   };
 
-  // Perform token refresh
+  // Perform token refresh via backend refresh endpoint
   const refreshAccessToken = async () => {
-    const currentRefreshToken = localStorage.getItem('refreshToken');
-    if (!currentRefreshToken) {
-      logout();
-      return null;
-    }
-
     try {
       const response = await fetch('/api/v1/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: currentRefreshToken }),
+        credentials: 'include', // Ensure browser sends the refreshToken cookie
       });
       const resData = await response.json();
 
@@ -108,49 +94,32 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Refresh failed');
       }
 
-      const newAccessToken = resData.data.accessToken;
-      const newRefreshToken = resData.data.refreshToken;
-
-      localStorage.setItem('accessToken', newAccessToken);
-      if (newRefreshToken) {
-        localStorage.setItem('refreshToken', newRefreshToken);
-        setRefreshToken(newRefreshToken);
-      }
-
-      setToken(newAccessToken);
-      return newAccessToken;
+      return true; // Access token successfully refreshed in backend cookie
     } catch (error) {
       console.warn('Session expired, logging out:', error.message);
       logout();
-      return null;
+      return false;
     }
   };
 
   // Standardized authenticated fetch call wrapper
   const apiCall = async (url, options = {}) => {
-    let currentToken = token;
-    
-    // Attach authorization header if token exists
     const headers = {
       'Content-Type': 'application/json',
       ...options.headers,
     };
 
-    if (currentToken) {
-      headers['Authorization'] = `Bearer ${currentToken}`;
-    }
-
-    let response = await fetch(url, { ...options, headers });
+    // credentials: 'include' forces browser to send and receive HttpOnly cookies
+    let response = await fetch(url, { ...options, headers, credentials: 'include' });
 
     // Handle token expiration (401 Unauthorized)
-    if (response.status === 401 && refreshToken) {
+    if (response.status === 401) {
       console.log('🔄 Access token expired. Attempting refresh...');
-      const newToken = await refreshAccessToken();
+      const refreshSuccess = await refreshAccessToken();
       
-      if (newToken) {
-        // Retry the original request with the new access token
-        headers['Authorization'] = `Bearer ${newToken}`;
-        response = await fetch(url, { ...options, headers });
+      if (refreshSuccess) {
+        // Retry the original request with the fresh cookie active
+        response = await fetch(url, { ...options, headers, credentials: 'include' });
       }
     }
 
@@ -158,15 +127,9 @@ export const AuthProvider = ({ children }) => {
     return resData;
   };
 
-  const value = {
-    user,
-    token,
-    loading,
-    login,
-    register,
-    logout,
-    apiCall,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, loading, login, register, logout, apiCall }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

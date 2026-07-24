@@ -5,12 +5,20 @@ import { requireRole } from '../middlewares/rbac.middleware.js';
 import {
   getBranches,
   createBranch,
+  updateBranch,
+  deleteBranch,
   getBuildings,
   createBuilding,
+  updateBuilding,
+  deleteBuilding,
   getFloors,
   createFloor,
+  updateFloor,
+  deleteFloor,
   getRooms,
   createRoom,
+  updateRoom,
+  deleteRoom,
   getLocationTree
 } from '../controllers/location.controller.js';
 
@@ -28,19 +36,35 @@ router.route('/branches')
   .get(getBranches)
   .post(requireRole('org_admin', 'super_admin'), createBranch);
 
+router.route('/branches/:id')
+  .put(requireRole('org_admin', 'super_admin'), updateBranch)
+  .delete(requireRole('org_admin', 'super_admin'), deleteBranch);
+
 // Buildings
 router.route('/buildings')
   .get(getBuildings)
   .post(requireRole('org_admin', 'super_admin'), createBuilding);
+
+router.route('/buildings/:id')
+  .put(requireRole('org_admin', 'super_admin'), updateBuilding)
+  .delete(requireRole('org_admin', 'super_admin'), deleteBuilding);
 
 // Floors
 router.route('/floors')
   .get(getFloors)
   .post(requireRole('org_admin', 'super_admin'), createFloor);
 
+router.route('/floors/:id')
+  .put(requireRole('org_admin', 'super_admin'), updateFloor)
+  .delete(requireRole('org_admin', 'super_admin'), deleteFloor);
+
 // Rooms
 router.route('/rooms')
   .get(getRooms)
   .post(requireRole('org_admin', 'super_admin'), createRoom);
+
+router.route('/rooms/:id')
+  .put(requireRole('org_admin', 'super_admin'), updateRoom)
+  .delete(requireRole('org_admin', 'super_admin'), deleteRoom);
 
 export default router;
