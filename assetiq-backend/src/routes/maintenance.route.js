@@ -6,6 +6,7 @@ import {
   getMaintenanceRequests,
   createMaintenanceRequest,
   updateMaintenanceRequest,
+  deleteMaintenanceRequest,
   completeMaintenance
 } from '../controllers/maintenance.controller.js';
 
@@ -21,7 +22,8 @@ router.route('/')
   .post(createMaintenanceRequest);
 
 router.route('/:id')
-  .put(requireRole('org_admin', 'super_admin', 'asset_manager'), updateMaintenanceRequest);
+  .put(requireRole('org_admin', 'super_admin', 'asset_manager'), updateMaintenanceRequest)
+  .delete(requireRole('org_admin', 'super_admin', 'asset_manager'), deleteMaintenanceRequest);
 
 router.post('/:id/complete', requireRole('org_admin', 'super_admin', 'asset_manager'), completeMaintenance);
 

@@ -43,6 +43,37 @@ export const createWarranty = async (req, res, next) => {
   }
 };
 
+export const updateWarranty = async (req, res, next) => {
+  try {
+    const { provider, startDate, endDate } = req.body;
+    const warranty = await Warranty.findById(req.params.id);
+    if (!warranty) {
+      return sendResponse(res, 404, false, 'Warranty not found');
+    }
+
+    if (provider) warranty.provider = provider;
+    if (startDate) warranty.startDate = startDate;
+    if (endDate) warranty.endDate = endDate;
+
+    await warranty.save();
+    return sendResponse(res, 200, true, 'Warranty updated successfully', warranty);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteWarranty = async (req, res, next) => {
+  try {
+    const warranty = await Warranty.findByIdAndDelete(req.params.id);
+    if (!warranty) {
+      return sendResponse(res, 404, false, 'Warranty not found');
+    }
+    return sendResponse(res, 200, true, 'Warranty deleted successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getExpiringWarranties = async (req, res, next) => {
   try {
     const thirtyDaysFromNow = new Date();

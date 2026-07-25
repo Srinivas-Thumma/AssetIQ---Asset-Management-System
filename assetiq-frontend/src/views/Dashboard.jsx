@@ -89,10 +89,10 @@ export default function Dashboard({ onNavigate }) {
 
   // Formatting datasets for Recharts
   const statusData = stats ? [
-    { name: 'Available', value: stats.available, color: '#6c3ce9' }, 
-    { name: 'Assigned', value: stats.assigned, color: '#8c56ff' }, 
-    { name: 'In Repair', value: stats.under_maintenance, color: '#af8cff' }, 
-    { name: 'Damaged', value: stats.damaged, color: '#d0baff' }, 
+    { name: 'Available', value: stats.available, color: '#39912f' }, 
+    { name: 'Assigned', value: stats.assigned, color: '#80b2e4' }, 
+    { name: 'In Repair', value: stats.under_maintenance, color: '#e8d93d' }, 
+    { name: 'Damaged', value: stats.damaged, color: '#d12626' }, 
   ].filter(d => d.value > 0) : [];
 
   const lineData = getWarrantyData();

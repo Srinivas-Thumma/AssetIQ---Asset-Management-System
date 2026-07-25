@@ -155,7 +155,8 @@ export const analyzeAssetHealth = async (asset, forceRecompute = false) => {
       endDate: warranty.endDate.toISOString().split('T')[0]
     } : 'No active warranty';
 
-    const prompt = `Analyze the health, failure risk, and remaining useful life of this asset.
+    const prompt = `Analyze the health, failure risk, and remaining useful life of THIS SPECIFIC asset, using the data below. Base every number strictly on this asset's actual age, status, and maintenance history — do not reuse any example values.
+
 Asset: ${asset.name}
 Code: ${asset.assetCode}
 Category: ${categoryName}
@@ -174,20 +175,18 @@ Predict the following metrics:
 5. Replacement recommendation comment
 6. Urgency priority level ("Low", "Medium", "High", "Critical")
 
-Return a JSON object with this exact structure:
+Return ONLY a JSON object with this exact structure — the values below are placeholders showing the expected TYPE, not real answers:
 {
-  "healthScore": 84,
-  "failureRiskPercent": 38,
-  "predictedNextMaintenanceDays": 95,
-  "remainingUsefulLifeMonths": 22,
-  "replacementRecommendation": "Monitor battery and fan wear.",
-  "priority": "Medium",
-  "insights": [
-    "Insight 1 (one clear descriptive sentence)",
-    "Insight 2 (one clear descriptive sentence)"
-  ]
+  "healthScore": <integer 0-100, based on this asset's actual condition>,
+  "failureRiskPercent": <integer 0-100>,
+  "predictedNextMaintenanceDays": <integer, days from today>,
+  "remainingUsefulLifeMonths": <integer>,
+  "replacementRecommendation": "<one sentence specific to this asset>",
+  "priority": "<Low|Medium|High|Critical>",
+  "insights": ["<specific observation about this asset>", "<another specific observation>"]
 }
-Do not include any chat formatting, markdown blocks outside the JSON, or extra text. Return ONLY valid JSON.`;
+
+Do not include markdown, code fences, or any text outside the JSON object.`;
 
     // Fetch available models from Ollama to pick a valid one
     let targetModel = 'llama3.1:8b';

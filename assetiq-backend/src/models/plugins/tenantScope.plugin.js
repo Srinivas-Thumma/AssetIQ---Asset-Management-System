@@ -1,5 +1,14 @@
 import { getTenantId } from '../../utils/tenantContext.js';
 
+/**
+ * Tenant Scoping Plugin:
+ * - Automatically injects organizationId into all schema models that register this plugin.
+ * - Enforces index scoping and pre-hooks to isolate data between tenants.
+ * 
+ * Connection Workflow:
+ * - Reads getTenantId() from AsyncLocalStorage (set by tenantScope middleware).
+ * - Appends organizationId query scope to all reads/writes.
+ */
 export function tenantScopePlugin(schema) {
   // Add organizationId field if it doesn't already exist
   if (!schema.path('organizationId')) {

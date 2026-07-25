@@ -102,7 +102,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Standardized authenticated fetch call wrapper
+  /**
+   * Standardized authenticated fetch call wrapper.
+   * 
+   * Connection Workflow:
+   * - Sets credentials to 'include' to force the browser to send the HTTP-only cookies
+   *   (set by setAuthCookies on login) in the request headers automatically.
+   * - If the request fails with a 401 Unauthorized (because accessToken expired),
+   *   it automatically intercepts the error, calls refreshAccessToken() to renew the cookie,
+   *   and retries the initial request seamlessly.
+   */
   const apiCall = async (url, options = {}) => {
     const headers = {
       'Content-Type': 'application/json',
@@ -115,6 +124,7 @@ export const AuthProvider = ({ children }) => {
     // Handle token expiration (401 Unauthorized)
     if (response.status === 401) {
       console.log('🔄 Access token expired. Attempting refresh...');
+      // Requests the backend refresh endpoint /api/v1/auth/refresh (which expects the refreshToken cookie)
       const refreshSuccess = await refreshAccessToken();
       
       if (refreshSuccess) {

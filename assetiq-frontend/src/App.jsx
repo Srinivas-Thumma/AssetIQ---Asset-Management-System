@@ -19,17 +19,32 @@ import {
 
 function AppContent() {
   const { user, loading, logout, apiCall } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
   // In-app notifications state
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Parse active tab segment from current URL path (e.g. /dashboard/assets -> 'assets')
+  const getTabFromPath = (path) => {
+    if (!path.startsWith('/dashboard')) return 'dashboard';
+    const segment = path.replace(/^\/dashboard\/?/, '').split('/')[0];
+    const validTabs = ['dashboard', 'assets', 'locations', 'maintenance', 'warranties', 'reports', 'setup', 'superadmin'];
+    return validTabs.includes(segment) ? segment : 'dashboard';
+  };
+
+  const activeTab = getTabFromPath(currentPath);
+
   // Custom routing navigation function
   const navigate = (path) => {
     window.history.pushState({}, '', path);
     setCurrentPath(path);
+  };
+
+  const handleTabNavigate = (tabId) => {
+    const targetPath = tabId === 'dashboard' ? '/dashboard' : `/dashboard/${tabId}`;
+    navigate(targetPath);
+    setShowNotifications(false);
   };
 
   // Sync state with browser Back/Forward navigation
@@ -95,8 +110,8 @@ function AppContent() {
           navigate('/dashboard');
         }
       } else {
-        // Unauthenticated users should be redirected to landing page or login if trying to access dashboard
-        if (currentPath === '/dashboard') {
+        // Unauthenticated users trying to access dashboard paths should be redirected to login
+        if (currentPath.startsWith('/dashboard')) {
           navigate('/login');
         }
       }
@@ -138,11 +153,11 @@ function AppContent() {
     );
   }
 
-  // 2. Authenticated State: Dashboard Shell (Only accessible under '/dashboard')
+  // 2. Authenticated State: Dashboard Shell
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard onNavigate={setActiveTab} />;
+        return <Dashboard onNavigate={handleTabNavigate} />;
       case 'assets':
         return <Assets />;
       case 'locations':
@@ -271,10 +286,7 @@ function AppContent() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setShowNotifications(false); // Close drawer
-                  }}
+                  onClick={() => handleTabNavigate(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                     isActive 
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' 

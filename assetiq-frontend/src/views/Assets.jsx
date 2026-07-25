@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Plus, Search, QrCode, Download, UserCheck, UserMinus, 
   Wrench, Activity, Trash2, Calendar, DollarSign, Tag, MapPin, 
-  HelpCircle, ChevronRight, X
+  HelpCircle, ChevronRight, X, ShieldAlert, Edit
 } from 'lucide-react';
 
 export default function Assets() {
@@ -28,6 +28,8 @@ export default function Assets() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editAssetData, setEditAssetData] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   
@@ -101,6 +103,52 @@ export default function Assets() {
       }
     } catch (err) {
       setFormError('Network error occurred.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenEdit = (asset) => {
+    setEditAssetData({
+      _id: asset._id,
+      assetCode: asset.assetCode,
+      name: asset.name,
+      categoryId: asset.categoryId?._id || asset.categoryId || '',
+      roomId: asset.roomId?._id || asset.roomId || '',
+      vendorId: asset.vendorId?._id || asset.vendorId || '',
+      purchasePrice: asset.purchasePrice || '',
+      status: asset.status || 'available',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateAsset = async (e) => {
+    e.preventDefault();
+    if (!editAssetData) return;
+    setSubmitting(true);
+    try {
+      const res = await apiCall(`/api/v1/assets/${editAssetData._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: editAssetData.name,
+          categoryId: editAssetData.categoryId,
+          roomId: editAssetData.roomId,
+          vendorId: editAssetData.vendorId,
+          purchasePrice: Number(editAssetData.purchasePrice),
+          status: editAssetData.status,
+        }),
+      });
+
+      if (res.success) {
+        setShowEditModal(false);
+        setEditAssetData(null);
+        fetchData();
+        if (showDetailsDrawer && selectedAsset?._id === editAssetData._id) {
+          handleOpenDetails(res.data || selectedAsset);
+        }
+      }
+    } catch (err) {
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
@@ -189,6 +237,27 @@ export default function Assets() {
       if (res.success) {
         setShowDetailsDrawer(false);
         fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMarkDamaged = async (assetId) => {
+    if (!window.confirm("Are you sure you want to mark this asset as damaged? This will flag it in stock checks.")) return;
+    setActionLoading(true);
+    try {
+      const res = await apiCall(`/api/v1/assets/${assetId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'damaged' })
+      });
+      if (res.success) {
+        fetchData();
+        if (showDetailsDrawer && selectedAsset?._id === assetId) {
+          setSelectedAsset(res.data || { ...selectedAsset, status: 'damaged' });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -333,6 +402,16 @@ export default function Assets() {
                           >
                             <QrCode className="h-4 w-4" />
                           </button>
+
+                          {user?.role !== 'employee' && (
+                            <button
+                              onClick={() => handleOpenEdit(asset)}
+                              title="Edit Asset"
+                              className="p-2 hover:bg-slate-100 text-slate-600 rounded-lg cursor-pointer"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
                           
                           {user?.role !== 'employee' && asset.status === 'available' && (
                             <button
@@ -501,6 +580,131 @@ export default function Assets() {
                   className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? 'Registering...' : 'Complete Register'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Asset Modal */}
+      {showEditModal && editAssetData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-2xl max-w-lg w-full space-y-5 animate-fade-in max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Edit Asset: {editAssetData.assetCode}</h3>
+                <p className="text-xs text-slate-400">Update specifications, locations, and status</p>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateAsset} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Asset Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editAssetData.name}
+                  onChange={(e) => setEditAssetData({ ...editAssetData, name: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                  <select
+                    required
+                    value={editAssetData.categoryId}
+                    onChange={(e) => setEditAssetData({ ...editAssetData, categoryId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((c) => (
+                      <option key={c._id} value={c._id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Room Location</label>
+                  <select
+                    required
+                    value={editAssetData.roomId}
+                    onChange={(e) => setEditAssetData({ ...editAssetData, roomId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
+                  >
+                    <option value="">Select Room</option>
+                    {rooms.map((r) => (
+                      <option key={r._id} value={r._id}>
+                        {r.name} - {r.floorId?.name} ({r.floorId?.buildingId?.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor</label>
+                  <select
+                    required
+                    value={editAssetData.vendorId}
+                    onChange={(e) => setEditAssetData({ ...editAssetData, vendorId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
+                  >
+                    <option value="">Select Vendor</option>
+                    {vendors.map((v) => (
+                      <option key={v._id} value={v._id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Purchase Price ($)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={editAssetData.purchasePrice}
+                    onChange={(e) => setEditAssetData({ ...editAssetData, purchasePrice: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Operational Status</label>
+                <select
+                  required
+                  value={editAssetData.status}
+                  onChange={(e) => setEditAssetData({ ...editAssetData, status: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none capitalize"
+                >
+                  <option value="available">Available</option>
+                  <option value="assigned">Assigned</option>
+                  <option value="under_maintenance">In Repair (Under Maintenance)</option>
+                  <option value="damaged">Damaged</option>
+                  <option value="retired">Retired</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  {submitting ? 'Updating...' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -768,14 +972,34 @@ export default function Assets() {
             {/* Footer buttons */}
             {user?.role !== 'employee' && (
               <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center gap-4 shrink-0">
-                <button
-                  onClick={() => handleRetire(selectedAsset._id)}
-                  disabled={actionLoading}
-                  className="flex items-center gap-1.5 text-xs text-red-600 hover:text-red-700 font-bold px-4 py-2 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Retire Asset
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleRetire(selectedAsset._id)}
+                    disabled={actionLoading}
+                    className="flex items-center gap-1.5 text-xs text-red-650 hover:text-red-700 font-bold px-3 py-2 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Retire
+                  </button>
+                  <button
+                    onClick={() => handleOpenEdit(selectedAsset)}
+                    disabled={actionLoading}
+                    className="flex items-center gap-1.5 text-xs text-blue-650 hover:text-blue-700 font-bold px-3 py-2 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                  {selectedAsset.status !== 'damaged' && selectedAsset.status !== 'retired' && (
+                    <button
+                      onClick={() => handleMarkDamaged(selectedAsset._id)}
+                      disabled={actionLoading}
+                      className="flex items-center gap-1.5 text-xs text-amber-650 hover:text-amber-700 font-bold px-3 py-2 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                    >
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                      Mark Damaged
+                    </button>
+                  )}
+                </div>
                 {selectedAsset.status === 'assigned' && (
                   <button
                     onClick={() => handleReturn(selectedAsset)}

@@ -40,20 +40,33 @@ const generateTokens = (user) => {
   return { accessToken, refreshToken };
 };
 
+/**
+ * Sets access and refresh tokens as secure HTTP-only cookies in the HTTP response.
+ * 
+ * Connection Workflow:
+ * - Frontend: When fetching with { credentials: 'include' } in AuthContext.apiCall,
+ *   the browser automatically includes these cookies in the Request Headers.
+ * - Backend: The cookieParser parses headers on every incoming request, and the
+ *   protect middleware extracts and validates 'accessToken'.
+ */
 const setAuthCookies = (res, accessToken, refreshToken) => {
   const isProd = process.env.NODE_ENV === 'production';
+
+  // 1. Access Token: Used to authorize all general requests.
   res.cookie('accessToken', accessToken, {
-    httpOnly: true,
-    secure: isProd,           // requires HTTPS in prod; false is fine for localhost http
-    sameSite: 'lax',          // sent on top-level navigation + same-site XHR, blocks basic CSRF vectors
-    maxAge: 24 * 60 * 60 * 1000, // 1 day, matches JWT_ACCESS expiry
+    httpOnly: true,              // 🔒 Prevents client JavaScript (XSS) from reading tokens.
+    secure: isProd,              // 🔒 Requires HTTPS in production (false on localhost HTTP).
+    sameSite: 'lax',             // 🔒 Blocks cross-site Request Forgery (CSRF) for standard actions.
+    maxAge: 24 * 60 * 60 * 1000, // 🕒 1 day expiration (matches JWT_ACCESS_SECRET payload lifetime).
   });
+
+  // 2. Refresh Token: Used strictly to rotate access tokens when they expire.
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: isProd,
     sameSite: 'lax',
-    path: '/api/v1/auth/refresh', // only ever sent to the refresh endpoint — narrows exposure
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/api/v1/auth/refresh', // 🎯 Scope limiting: Browser ONLY sends this cookie to the refresh route.
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 🕒 7 days expiration.
   });
 };
 

@@ -145,3 +145,30 @@ export const completeMaintenance = async (req, res, next) => {
     next(error);
   }
 };
+
+export const deleteMaintenanceRequest = async (req, res, next) => {
+  try {
+    const request = await MaintenanceRequest.findById(req.params.id);
+    if (!request) {
+      return sendResponse(res, 404, false, 'Maintenance request not found');
+    }
+
+    const assetId = request.assetId;
+    await request.deleteOne();
+
+    if (assetId) {
+      const otherActive = await MaintenanceRequest.findOne({ assetId, status: { $in: ['open', 'assigned', 'in_progress'] } });
+      if (!otherActive) {
+        const asset = await Asset.findById(assetId);
+        if (asset && asset.status === 'under_maintenance') {
+          asset.status = 'available';
+          await asset.save();
+        }
+      }
+    }
+
+    return sendResponse(res, 200, true, 'Maintenance request deleted successfully');
+  } catch (error) {
+    next(error);
+  }
+};

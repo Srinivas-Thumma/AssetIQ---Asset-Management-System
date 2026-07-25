@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, AlertCircle, Plus, CheckCircle, Wrench, ShieldAlert, X } from 'lucide-react';
+import { Calendar, AlertCircle, Plus, CheckCircle, Wrench, ShieldAlert, X, Edit, Trash2 } from 'lucide-react';
 
 export default function Maintenance() {
   const { apiCall, user } = useAuth();
@@ -13,6 +13,8 @@ export default function Maintenance() {
   // Modals state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editRequestData, setEditRequestData] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   // New Request Form state
@@ -131,6 +133,67 @@ export default function Maintenance() {
     }
   };
 
+  const handleOpenEditRequest = (request) => {
+    setEditRequestData({
+      _id: request._id,
+      assetName: request.assetId?.name || 'Asset',
+      assetCode: request.assetId?.assetCode || '',
+      type: request.type || 'corrective',
+      priority: request.priority || 'medium',
+      status: request.status || 'open',
+      description: request.description || '',
+      scheduledDate: request.scheduledDate ? new Date(request.scheduledDate).toISOString().split('T')[0] : '',
+    });
+    setFormError('');
+    setShowEditModal(true);
+  };
+
+  const handleUpdateRequest = async (e) => {
+    e.preventDefault();
+    setFormError('');
+    setSubmitting(true);
+
+    try {
+      const res = await apiCall(`/api/v1/maintenance/${editRequestData._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          priority: editRequestData.priority,
+          status: editRequestData.status,
+          description: editRequestData.description,
+          scheduledDate: editRequestData.scheduledDate,
+        }),
+      });
+
+      if (res.success) {
+        setShowEditModal(false);
+        setEditRequestData(null);
+        fetchData();
+      } else {
+        setFormError(res.message || 'Failed to update maintenance ticket');
+      }
+    } catch (err) {
+      setFormError('Network error occurred.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteRequest = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this maintenance ticket?')) return;
+    try {
+      const res = await apiCall(`/api/v1/maintenance/${id}`, {
+        method: 'DELETE',
+      });
+      if (res.success) {
+        fetchData();
+      } else {
+        alert(res.message || 'Failed to delete maintenance ticket');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -223,6 +286,25 @@ export default function Maintenance() {
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {user?.role !== 'employee' && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditRequest(req)}
+                                title="Edit Maintenance Ticket"
+                                className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg cursor-pointer"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRequest(req._id)}
+                                title="Delete Maintenance Ticket"
+                                className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-lg cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+
                           {user?.role !== 'employee' && req.status === 'open' && (
                             <button
                               onClick={() => handleUpdateStatus(req._id, 'assigned')}
@@ -443,6 +525,99 @@ export default function Maintenance() {
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? 'Logging Resolution...' : 'Resolve Ticket & Trigger AI'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Maintenance Ticket Modal */}
+      {showEditModal && editRequestData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Edit Maintenance Ticket</h3>
+                <p className="text-xs text-slate-400">Target Asset: {editRequestData.assetName} ({editRequestData.assetCode})</p>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateRequest} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs">
+                  {formError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Priority</label>
+                  <select
+                    value={editRequestData.priority}
+                    onChange={(e) => setEditRequestData({ ...editRequestData, priority: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none capitalize"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+                  <select
+                    value={editRequestData.status}
+                    onChange={(e) => setEditRequestData({ ...editRequestData, status: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none capitalize"
+                  >
+                    <option value="open">Open</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Scheduled Date</label>
+                <input
+                  type="date"
+                  required
+                  value={editRequestData.scheduledDate}
+                  onChange={(e) => setEditRequestData({ ...editRequestData, scheduledDate: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Description / Issue Summary</label>
+                <textarea
+                  required
+                  rows="3"
+                  value={editRequestData.description}
+                  onChange={(e) => setEditRequestData({ ...editRequestData, description: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  {submitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

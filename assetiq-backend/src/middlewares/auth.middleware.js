@@ -2,7 +2,19 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { User } from '../models/User.js';
 
+/**
+ * Authentication Gatekeeper Middleware:
+ * - Checks, extracts, and verifies the accessToken HTTP-only cookie on every incoming API request.
+ * 
+ * Connection workflow:
+ * - Reads cookie populated by 'cookie-parser' middleware.
+ * - Decrypts payload containing user ID.
+ * - Queries User from MongoDB.
+ * - Attaches user and organization context (req.orgId) which is picked up downstream
+ *   by the 'tenantScope' middleware to configure AsyncLocalStorage thread-safety.
+ */
 export const protect = async (req, res, next) => {
+  // 1. Retrieve the HTTP-only cookie containing the JWT Access Token
   const token = req.cookies?.accessToken;
 
   if (!token) {
@@ -11,24 +23,13 @@ export const protect = async (req, res, next) => {
       message: 'Not authorized to access this route, no token provided',
     });
   }
-  // Find user. Note: since User has tenantScopePlugin, we must run this query 
-    // under tenant scope or bypass it. But wait! Since user registration/login JWT contains
-    // organizationId, we can set tenant storage context before loading the user, or 
-    // bypass tenantScopePlugin for auth validation.
-    // Wait! Since JWT payload has organizationId, we can run this query using getTenantId() 
-    // set or we can let User model handle it because User has tenantScopePlugin which needs 
-    // organizationId in AsyncLocalStorage.
-    // Let's make sure the protect middleware retrieves user by ID by bypass-scoping, 
-    // or by setting the context first!
-    // If we set the tenantStorage context before doing User.findById, it will work perfectly!
-    // Let's write the code to retrieve the user by ID and attach it.
-    // To do that, we can temporarily retrieve the user.
-    // Wait, User has a tenantScopePlugin. If getTenantId() is not set yet, User.findById(decoded.id) 
-    // will execute without scoping, which is perfectly safe since we are fetching by a unique MongoDB ObjectId!
 
   try {
+    // 2. Decode and verify the JWT signature using backend secret
     const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET);
 
+    // 3. Find the matching User in the database
+    // (Note: because getTenantId() is not set yet, this query runs unscoped, which is safe since we query by unique MongoDB ObjectId)
     const user = await User.findById(decoded.id);
 
     if (!user) {
@@ -45,6 +46,8 @@ export const protect = async (req, res, next) => {
       });
     }
 
+    // 4. Attach contexts to Request object. 
+    // req.orgId is extracted by tenantScope middleware downstream to establish the tenant storage workspace.
     req.user = user;
     req.orgId = user.organizationId;
     
