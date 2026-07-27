@@ -3,17 +3,18 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { io as Client } from 'socket.io-client';
-import { connectDB } from '../config/db.js';
-import { env } from '../config/env.js';
-import { initSocket } from '../config/socket.js';
-import { Organization } from '../models/Organization.js';
-import { User } from '../models/User.js';
-import { Plan } from '../models/Plan.js';
-import { Asset } from '../models/Asset.js';
-import { MaintenanceRequest } from '../models/MaintenanceRequest.js';
+import { connectDB } from '../../src/config/db.js';
+import { env } from '../../src/config/env.js';
+import { initSocket } from '../../src/config/socket.js';
+import { Organization } from '../../src/models/Organization.js';
+import { User } from '../../src/models/User.js';
+import { Plan } from '../../src/models/Plan.js';
+import { Asset } from '../../src/models/Asset.js';
+import { Employee } from '../../src/models/Employee.js';
+import { MaintenanceRequest } from '../../src/models/MaintenanceRequest.js';
 
-const runDay5Day6Checkpoint = async () => {
-  console.log('🧪 Starting Day 5 & 6 Checkpoint: Full Chat Integration & Reconnection Pass...');
+const runChatIntegrationAndReconnectVerification = async () => {
+  console.log('🧪 Starting Full Chat Integration & Reconnection Test...');
   await connectDB();
 
   let plan = await Plan.findOne();
@@ -22,16 +23,16 @@ const runDay5Day6Checkpoint = async () => {
   }
 
   // 1. Provision Test Organization
-  let org = await Organization.findOne({ slug: 'org-full-test' });
+  let org = await Organization.findOne({ slug: 'org-full-v-test' });
   if (!org) {
-    org = await Organization.create({ name: 'Full Integration Org', slug: 'org-full-test', planId: plan._id });
+    org = await Organization.create({ name: 'Full Integration Org', slug: 'org-full-v-test', planId: plan._id });
   }
 
   // 2. Provision Roles: Org Admin, Asset Manager, Assigned Employee
-  let orgAdmin = await User.findOne({ email: 'orgadmin@fulltest.com' });
+  let orgAdmin = await User.findOne({ email: 'orgadmin@fullvtest.com' });
   if (!orgAdmin) {
     orgAdmin = await User.create({
-      email: 'orgadmin@fulltest.com',
+      email: 'orgadmin@fullvtest.com',
       passwordHash: 'password123',
       role: 'org_admin',
       organizationId: org._id,
@@ -39,10 +40,10 @@ const runDay5Day6Checkpoint = async () => {
     });
   }
 
-  let assetManager = await User.findOne({ email: 'manager@fulltest.com' });
+  let assetManager = await User.findOne({ email: 'manager@fullvtest.com' });
   if (!assetManager) {
     assetManager = await User.create({
-      email: 'manager@fulltest.com',
+      email: 'manager@fullvtest.com',
       passwordHash: 'password123',
       role: 'asset_manager',
       organizationId: org._id,
@@ -50,19 +51,34 @@ const runDay5Day6Checkpoint = async () => {
     });
   }
 
-  let assignedEmployee = await User.findOne({ email: 'employee@fulltest.com' });
-  if (!assignedEmployee) {
-    assignedEmployee = await User.create({
-      email: 'employee@fulltest.com',
-      passwordHash: 'password123',
-      role: 'employee',
+  let empProfile = await Employee.findOne({ email: 'employee@fullvtest.com' });
+  if (!empProfile) {
+    empProfile = await Employee.create({
       organizationId: org._id,
-      status: 'active',
+      name: 'Full Test Employee',
+      employeeId: 'EMP-FULL-01',
+      email: 'employee@fullvtest.com',
+      departmentId: new mongoose.Types.ObjectId(),
     });
   }
 
+  let assignedEmployee = await User.findOne({ email: 'employee@fullvtest.com' });
+  if (!assignedEmployee) {
+    assignedEmployee = await User.create({
+      email: 'employee@fullvtest.com',
+      passwordHash: 'password123',
+      role: 'employee',
+      organizationId: org._id,
+      employeeRef: empProfile._id,
+      status: 'active',
+    });
+  } else if (!assignedEmployee.employeeRef) {
+    assignedEmployee.employeeRef = empProfile._id;
+    await assignedEmployee.save();
+  }
+
   // 3. Provision Asset & Maintenance Ticket
-  let asset = await Asset.findOne({ name: 'Corporate Workstation 01' });
+  let asset = await Asset.findOne({ organizationId: org._id, name: 'Corporate Workstation 01' });
   if (!asset) {
     asset = await Asset.create({
       organizationId: org._id,
@@ -71,14 +87,14 @@ const runDay5Day6Checkpoint = async () => {
       categoryId: new mongoose.Types.ObjectId(),
       roomId: new mongoose.Types.ObjectId(),
       vendorId: new mongoose.Types.ObjectId(),
-      assignedTo: assignedEmployee._id,
+      assignedTo: empProfile._id,
       purchasePrice: 2000,
       purchaseDate: new Date(),
       status: 'under_maintenance',
     });
   }
 
-  let request = await MaintenanceRequest.findOne({ description: 'GPU overheating issue' });
+  let request = await MaintenanceRequest.findOne({ organizationId: org._id, description: 'GPU overheating issue' });
   if (!request) {
     request = await MaintenanceRequest.create({
       organizationId: org._id,
@@ -137,7 +153,7 @@ const runDay5Day6Checkpoint = async () => {
   await new Promise((resolve) => setTimeout(resolve, 800));
 
   // 9. Day 6 Reconnection Test: Simulate Employee socket network disconnect & reconnect
-  console.log('\n--- DAY 6 EDGE CASE TEST: Simulating socket disconnect & reconnect ---');
+  console.log('\n--- EDGE CASE TEST: Simulating socket disconnect & reconnect ---');
   clientEmployee.disconnect();
   await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -177,15 +193,15 @@ const runDay5Day6Checkpoint = async () => {
   await new Promise((resolve) => server.close(resolve));
 
   if (passed) {
-    console.log('\n✅ DAY 5 & 6 CHECKPOINT PASSED: Full integration, real-time chat, and reconnection edge cases 100% verified!');
+    console.log('\n✅ VERIFICATION PASSED: Full integration, real-time chat, and reconnection edge cases 100% verified!');
     process.exit(0);
   } else {
-    console.error('\n❌ DAY 5 & 6 CHECKPOINT FAILED!');
+    console.error('\n❌ VERIFICATION FAILED!');
     process.exit(1);
   }
 };
 
-runDay5Day6Checkpoint().catch((err) => {
+runChatIntegrationAndReconnectVerification().catch((err) => {
   console.error('❌ Checkpoint Error:', err);
   process.exit(1);
 });

@@ -81,6 +81,11 @@ const assetSchema = new mongoose.Schema(
         default: null,
       },
     },
+    customValues: {
+      type: Map,
+      of: String,
+      default: {},
+    },
   },
   { timestamps: true }
 );

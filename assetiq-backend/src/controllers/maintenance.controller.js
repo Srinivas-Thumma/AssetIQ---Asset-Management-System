@@ -187,7 +187,10 @@ export const getMaintenanceMessages = async (req, res, next) => {
     // Role permission check for employees
     if (req.user.role === 'employee') {
       const asset = await Asset.findById(request.assetId);
-      const isAssigned = asset && asset.assignedTo && asset.assignedTo.toString() === req.user.employeeId?.toString();
+      const isAssigned = asset && asset.assignedTo && (
+        asset.assignedTo.toString() === req.user.employeeRef?.toString() ||
+        asset.assignedTo.toString() === req.user._id.toString()
+      );
       const isRaisedBy = request.raisedBy.toString() === req.user._id.toString();
 
       if (!isAssigned && !isRaisedBy) {
@@ -219,7 +222,10 @@ export const createMaintenanceMessage = async (req, res, next) => {
     // Role permission check for employees
     if (req.user.role === 'employee') {
       const asset = await Asset.findById(request.assetId);
-      const isAssigned = asset && asset.assignedTo && asset.assignedTo.toString() === req.user.employeeId?.toString();
+      const isAssigned = asset && asset.assignedTo && (
+        asset.assignedTo.toString() === req.user.employeeRef?.toString() ||
+        asset.assignedTo.toString() === req.user._id.toString()
+      );
       const isRaisedBy = request.raisedBy.toString() === req.user._id.toString();
 
       if (!isAssigned && !isRaisedBy) {
@@ -235,6 +241,15 @@ export const createMaintenanceMessage = async (req, res, next) => {
       senderRole: req.user.role,
       message: message.trim(),
     });
+
+    // Broadcast live over WebSocket if socket server is running
+    try {
+      const { getIO } = await import('../config/socket.js');
+      const io = getIO();
+      io.to(`chat:request:${id}`).emit('chat:message', newMessage);
+    } catch (socketErr) {
+      // Socket server may not be running during standalone REST testing
+    }
 
     return sendResponse(res, 201, true, 'Maintenance message created', newMessage);
   } catch (error) {

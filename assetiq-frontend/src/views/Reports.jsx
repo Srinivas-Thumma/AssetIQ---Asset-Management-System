@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid } from 'recharts';
-import { DollarSign, Landmark, HelpCircle, Activity, TrendingUp, RefreshCw } from 'lucide-react';
+import { DollarSign, Landmark, HelpCircle, Activity, TrendingUp, RefreshCw, FileSpreadsheet } from 'lucide-react';
 
 export default function Reports() {
   const { apiCall } = useAuth();
@@ -32,6 +32,71 @@ export default function Reports() {
     fetchReports();
   }, []);
 
+  const handleExportExcel = () => {
+    const BOM = '\uFEFF'; // UTF-8 BOM for Microsoft Excel native encoding
+    let csvContent = BOM;
+
+    // Header & Title
+    csvContent += "AssetIQ Financial & Allocation Audit Report\n";
+    csvContent += `Generated Date:,"${new Date().toLocaleString()}"\n\n`;
+
+    // Summary Metrics
+    csvContent += "EXECUTIVE FINANCIAL SUMMARY\n";
+    csvContent += "Metric,Value\n";
+    csvContent += `"Total Maintenance Billing","$${costData.totalCost || 0}"\n`;
+    const topCategory = costData.categoryCost.length > 0
+      ? [...costData.categoryCost].sort((a,b) => b.cost - a.cost)[0]?.category
+      : 'None';
+    csvContent += `"Highest Spending Category","${topCategory}"\n`;
+    csvContent += `"Office Locations Seeded","${locationData.length || 0}"\n\n`;
+
+    // Monthly Expense Timeline
+    csvContent += "MONTHLY REPAIR EXPENSE TIMELINE\n";
+    csvContent += "Month,Expense ($)\n";
+    if (costData.monthlyCost && costData.monthlyCost.length > 0) {
+      costData.monthlyCost.forEach(item => {
+        csvContent += `"${item.month}",${item.cost}\n`;
+      });
+    } else {
+      csvContent += "No historical monthly repair expenses recorded.\n";
+    }
+    csvContent += "\n";
+
+    // Category Breakdown
+    csvContent += "EXPENSES BY ASSET CATEGORY\n";
+    csvContent += "Category,Cumulative Cost ($)\n";
+    if (costData.categoryCost && costData.categoryCost.length > 0) {
+      costData.categoryCost.forEach(item => {
+        csvContent += `"${item.category}",${item.cost}\n`;
+      });
+    } else {
+      csvContent += "No category maintenance costs recorded.\n";
+    }
+    csvContent += "\n";
+
+    // Location Allocation
+    csvContent += "ASSET LOADING BY BUILDING LOCATION\n";
+    csvContent += "Building / Location,Asset Count\n";
+    if (locationData && locationData.length > 0) {
+      locationData.forEach(item => {
+        csvContent += `"${item.location}",${item.assetsCount}\n`;
+      });
+    } else {
+      csvContent += "No building asset allocations recorded.\n";
+    }
+
+    // Create downloadable file blob and trigger browser download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `AssetIQ_Financial_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -48,14 +113,26 @@ export default function Reports() {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Financial & Allocation Reports</h1>
           <p className="text-slate-500 mt-1">Audit cumulative repair billing, budget allocation, and spatial loading distributions.</p>
         </div>
-        <button
-          onClick={fetchReports}
-          disabled={refreshing}
-          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Recalculate Audits
-        </button>
+        
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-xl shadow-xs cursor-pointer transition-all active:scale-[0.98]"
+            title="Export report metrics to Microsoft Excel CSV"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export as Excel
+          </button>
+
+          <button
+            onClick={fetchReports}
+            disabled={refreshing}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition-all active:scale-[0.98]"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Recalculate Audits
+          </button>
+        </div>
       </div>
 
       {/* Overview stats cards */}

@@ -26,9 +26,25 @@ function AppContent() {
   // In-app notifications state
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [platformBanner, setPlatformBanner] = useState(null);
+
+  // Fetch active platform announcement banner
+  useEffect(() => {
+    fetch('/api/v1/platform/active')
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && res.data) {
+          if (!res.data.expiresAt || new Date(res.data.expiresAt) > new Date()) {
+            setPlatformBanner(res.data);
+          }
+        }
+      })
+      .catch(err => console.error('Failed to fetch platform banner:', err));
+  }, []);
 
   // Parse active tab segment from current URL path (e.g. /dashboard/assets -> 'assets')
   const getTabFromPath = (path) => {
+    if (user?.role === 'super_admin') return 'superadmin';
     if (!path.startsWith('/dashboard')) return 'dashboard';
     const segment = path.replace(/^\/dashboard\/?/, '').split('/')[0];
     const validTabs = ['dashboard', 'assets', 'locations', 'maintenance', 'warranties', 'reports', 'setup', 'superadmin'];
@@ -125,7 +141,8 @@ function AppContent() {
       if (user) {
         // Authenticated users should not access login, register, or landing pages
         if (['/', '/login', '/register'].includes(currentPath)) {
-          navigate('/dashboard');
+          const defaultPath = user.role === 'super_admin' ? '/dashboard/superadmin' : '/dashboard';
+          navigate(defaultPath);
         }
       } else {
         // Unauthenticated users trying to access dashboard paths should be redirected to login
@@ -191,18 +208,18 @@ function AppContent() {
       case 'superadmin':
         return user.role === 'super_admin' ? <SuperAdmin /> : <Dashboard />;
       default:
-        return <Dashboard />;
+        return user.role === 'super_admin' ? <SuperAdmin /> : <Dashboard />;
     }
   };
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['super_admin', 'org_admin', 'asset_manager', 'employee'] },
-    { id: 'assets', label: 'Assets', icon: Package, roles: ['super_admin', 'org_admin', 'asset_manager', 'employee'] },
-    { id: 'locations', label: 'Locations', icon: MapPin, roles: ['super_admin', 'org_admin'] },
-    { id: 'maintenance', label: 'Maintenance', icon: Wrench, roles: ['super_admin', 'org_admin', 'asset_manager', 'employee'] },
-    { id: 'warranties', label: 'Warranties', icon: ShieldIcon, roles: ['super_admin', 'org_admin', 'asset_manager', 'employee'] },
-    { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['super_admin', 'org_admin', 'asset_manager'] },
-    { id: 'setup', label: 'Org Setup', icon: Settings, roles: ['super_admin', 'org_admin'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['org_admin', 'asset_manager', 'employee'] },
+    { id: 'assets', label: 'Assets', icon: Package, roles: ['org_admin', 'asset_manager', 'employee'] },
+    { id: 'locations', label: 'Locations', icon: MapPin, roles: ['org_admin'] },
+    { id: 'maintenance', label: 'Maintenance', icon: Wrench, roles: ['org_admin', 'asset_manager', 'employee'] },
+    { id: 'warranties', label: 'Warranties', icon: ShieldIcon, roles: ['org_admin', 'asset_manager', 'employee'] },
+    { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['org_admin', 'asset_manager'] },
+    { id: 'setup', label: 'Org Setup', icon: Settings, roles: ['org_admin'] },
     { id: 'superadmin', label: 'Platform Controls', icon: Globe, roles: ['super_admin'] },
   ];
 
@@ -214,9 +231,20 @@ function AppContent() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      {/* Sidebar Panel */}
-      <aside className="w-64 bg-white border-r border-slate-100 flex flex-col shrink-0">
+    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
+      {platformBanner && (
+        <div className={`w-full text-center py-2 px-4 text-xs font-bold text-white shadow-xs z-50 flex items-center justify-center gap-2 ${
+          platformBanner.type === 'warning' ? 'bg-amber-500' :
+          platformBanner.type === 'maintenance' ? 'bg-rose-600' :
+          platformBanner.type === 'success' ? 'bg-emerald-600' : 'bg-blue-600'
+        }`}>
+          <span>📣 {platformBanner.title}:</span>
+          <span className="font-medium">{platformBanner.message}</span>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar Panel */}
+        <aside className="w-64 bg-white border-r border-slate-100 flex flex-col shrink-0">
         
         {/* Branding header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-100 relative">
@@ -356,6 +384,7 @@ function AppContent() {
           {renderActiveView()}
         </div>
       </main>
+      </div>
     </div>
   );
 }

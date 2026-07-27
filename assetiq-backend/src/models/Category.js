@@ -11,6 +11,12 @@ const categorySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    customAttributes: [{
+      key: { type: String, required: true },
+      label: { type: String, required: true },
+      dataType: { type: String, enum: ['text', 'number', 'date'], default: 'text' },
+      required: { type: Boolean, default: false }
+    }]
   },
   { timestamps: true }
 );

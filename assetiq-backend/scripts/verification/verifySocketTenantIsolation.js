@@ -2,15 +2,15 @@ import http from 'http';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { io as Client } from 'socket.io-client';
-import { connectDB } from '../config/db.js';
-import { env } from '../config/env.js';
-import { initSocket } from '../config/socket.js';
-import { Organization } from '../models/Organization.js';
-import { User } from '../models/User.js';
-import { Plan } from '../models/Plan.js';
+import { connectDB } from '../../src/config/db.js';
+import { env } from '../../src/config/env.js';
+import { initSocket } from '../../src/config/socket.js';
+import { Organization } from '../../src/models/Organization.js';
+import { User } from '../../src/models/User.js';
+import { Plan } from '../../src/models/Plan.js';
 
-const runDay1Checkpoint = async () => {
-  console.log('🧪 Starting Day 1 Checkpoint: Socket Infrastructure & Tenant Room Isolation Test...');
+const runSocketTenantIsolationVerification = async () => {
+  console.log('🧪 Starting Socket Infrastructure & Tenant Room Isolation Test...');
   await connectDB();
 
   let plan = await Plan.findOne();
@@ -19,21 +19,21 @@ const runDay1Checkpoint = async () => {
   }
 
   // 1. Setup Test Organizations
-  let orgA = await Organization.findOne({ slug: 'org-a-test' });
+  let orgA = await Organization.findOne({ slug: 'org-a-iso-test' });
   if (!orgA) {
-    orgA = await Organization.create({ name: 'Test Org A', slug: 'org-a-test', planId: plan._id });
+    orgA = await Organization.create({ name: 'Test Org A', slug: 'org-a-iso-test', planId: plan._id });
   }
 
-  let orgB = await Organization.findOne({ slug: 'org-b-test' });
+  let orgB = await Organization.findOne({ slug: 'org-b-iso-test' });
   if (!orgB) {
-    orgB = await Organization.create({ name: 'Test Org B', slug: 'org-b-test', planId: plan._id });
+    orgB = await Organization.create({ name: 'Test Org B', slug: 'org-b-iso-test', planId: plan._id });
   }
 
   // 2. Setup Test Users
-  let userA = await User.findOne({ email: 'usera@orga.com' });
+  let userA = await User.findOne({ email: 'usera@orga-iso.com' });
   if (!userA) {
     userA = await User.create({
-      email: 'usera@orga.com',
+      email: 'usera@orga-iso.com',
       passwordHash: 'password123',
       role: 'org_admin',
       organizationId: orgA._id,
@@ -41,10 +41,10 @@ const runDay1Checkpoint = async () => {
     });
   }
 
-  let userB = await User.findOne({ email: 'userb@orgb.com' });
+  let userB = await User.findOne({ email: 'userb@orgb-iso.com' });
   if (!userB) {
     userB = await User.create({
-      email: 'userb@orgb.com',
+      email: 'userb@orgb-iso.com',
       passwordHash: 'password123',
       role: 'org_admin',
       organizationId: orgB._id,
@@ -86,8 +86,8 @@ const runDay1Checkpoint = async () => {
   await new Promise((resolve) => setTimeout(resolve, 1500));
 
   // 6. Verify Isolation Criteria
-  const roomsA = roomSnapshots['usera@orga.com'] || [];
-  const roomsB = roomSnapshots['userb@orgb.com'] || [];
+  const roomsA = roomSnapshots['usera@orga-iso.com'] || [];
+  const roomsB = roomSnapshots['userb@orgb-iso.com'] || [];
 
   console.log('\n--- SERVER-SIDE ROOM MEMBERSHIP AUDIT ---');
   console.log('User A (Org A) Rooms:', roomsA);
@@ -134,15 +134,15 @@ const runDay1Checkpoint = async () => {
   await new Promise((resolve) => server.close(resolve));
 
   if (passed) {
-    console.log('\n✅ DAY 1 CHECKPOINT PASSED: Socket infrastructure & cross-tenant room isolation verified!');
+    console.log('\n✅ VERIFICATION PASSED: Socket infrastructure & cross-tenant room isolation verified!');
     process.exit(0);
   } else {
-    console.error('\n❌ DAY 1 CHECKPOINT FAILED: Room isolation bounds violated!');
+    console.error('\n❌ VERIFICATION FAILED: Room isolation bounds violated!');
     process.exit(1);
   }
 };
 
-runDay1Checkpoint().catch((err) => {
+runSocketTenantIsolationVerification().catch((err) => {
   console.error('❌ Checkpoint Error:', err);
   process.exit(1);
 });

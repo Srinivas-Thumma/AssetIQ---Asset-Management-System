@@ -1,15 +1,15 @@
 import mongoose from 'mongoose';
-import { connectDB } from '../config/db.js';
-import { runWithTenant } from '../utils/tenantContext.js';
-import { Organization } from '../models/Organization.js';
-import { User } from '../models/User.js';
-import { Plan } from '../models/Plan.js';
-import { Asset } from '../models/Asset.js';
-import { MaintenanceRequest } from '../models/MaintenanceRequest.js';
-import { MaintenanceMessage } from '../models/MaintenanceMessage.js';
+import { connectDB } from '../../src/config/db.js';
+import { runWithTenant } from '../../src/utils/tenantContext.js';
+import { Organization } from '../../src/models/Organization.js';
+import { User } from '../../src/models/User.js';
+import { Plan } from '../../src/models/Plan.js';
+import { Asset } from '../../src/models/Asset.js';
+import { MaintenanceRequest } from '../../src/models/MaintenanceRequest.js';
+import { MaintenanceMessage } from '../../src/models/MaintenanceMessage.js';
 
-const runDay3Checkpoint = async () => {
-  console.log('🧪 Starting Day 3 Checkpoint: MaintenanceMessage REST History & Isolation Test...');
+const runMessageHistoryRestVerification = async () => {
+  console.log('🧪 Starting MaintenanceMessage REST History & Isolation Test...');
   await connectDB();
 
   let plan = await Plan.findOne();
@@ -18,21 +18,21 @@ const runDay3Checkpoint = async () => {
   }
 
   // 1. Provision Test Organizations
-  let orgA = await Organization.findOne({ slug: 'org-a-msg-test' });
+  let orgA = await Organization.findOne({ slug: 'org-a-msg-v-test' });
   if (!orgA) {
-    orgA = await Organization.create({ name: 'Msg Test Org A', slug: 'org-a-msg-test', planId: plan._id });
+    orgA = await Organization.create({ name: 'Msg Test Org A', slug: 'org-a-msg-v-test', planId: plan._id });
   }
 
-  let orgB = await Organization.findOne({ slug: 'org-b-msg-test' });
+  let orgB = await Organization.findOne({ slug: 'org-b-msg-v-test' });
   if (!orgB) {
-    orgB = await Organization.create({ name: 'Msg Test Org B', slug: 'org-b-msg-test', planId: plan._id });
+    orgB = await Organization.create({ name: 'Msg Test Org B', slug: 'org-b-msg-v-test', planId: plan._id });
   }
 
   // 2. Provision Test Users
-  let userA = await User.findOne({ email: 'adminA@orga-msg.com' });
+  let userA = await User.findOne({ email: 'adminA@orga-msg-v.com' });
   if (!userA) {
     userA = await User.create({
-      email: 'adminA@orga-msg.com',
+      email: 'adminA@orga-msg-v.com',
       passwordHash: 'password123',
       role: 'org_admin',
       organizationId: orgA._id,
@@ -40,10 +40,10 @@ const runDay3Checkpoint = async () => {
     });
   }
 
-  let userB = await User.findOne({ email: 'adminB@orgb-msg.com' });
+  let userB = await User.findOne({ email: 'adminB@orgb-msg-v.com' });
   if (!userB) {
     userB = await User.create({
-      email: 'adminB@orgb-msg.com',
+      email: 'adminB@orgb-msg-v.com',
       passwordHash: 'password123',
       role: 'org_admin',
       organizationId: orgB._id,
@@ -110,7 +110,6 @@ const runDay3Checkpoint = async () => {
   let messagesFetchedByOrgB = [];
 
   await runWithTenant(orgB._id.toString(), async () => {
-    // Attempting to query Org A's request ID under Org B's AsyncLocalStorage context
     requestFetchedByOrgB = await MaintenanceRequest.findById(requestAId);
     messagesFetchedByOrgB = await MaintenanceMessage.find({ requestId: requestAId });
   });
@@ -138,15 +137,15 @@ const runDay3Checkpoint = async () => {
   }
 
   if (passed) {
-    console.log('\n✅ DAY 3 CHECKPOINT PASSED: MaintenanceMessage REST history endpoint & tenant isolation verified!');
+    console.log('\n✅ VERIFICATION PASSED: MaintenanceMessage REST history endpoint & tenant isolation verified!');
     process.exit(0);
   } else {
-    console.error('\n❌ DAY 3 CHECKPOINT FAILED!');
+    console.error('\n❌ VERIFICATION FAILED!');
     process.exit(1);
   }
 };
 
-runDay3Checkpoint().catch((err) => {
+runMessageHistoryRestVerification().catch((err) => {
   console.error('❌ Checkpoint Error:', err);
   process.exit(1);
 });

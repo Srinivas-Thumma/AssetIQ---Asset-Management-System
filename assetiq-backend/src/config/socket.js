@@ -33,7 +33,10 @@ const checkChatAccessPermission = async (socket, requestId) => {
   // 3. Employee role permissions
   if (socket.user.role === 'employee') {
     const asset = await Asset.findById(request.assetId);
-    const isAssigned = asset && asset.assignedTo && asset.assignedTo.toString() === socket.user.employeeId?.toString();
+    const isAssigned = asset && asset.assignedTo && (
+      asset.assignedTo.toString() === socket.user.employeeRef?.toString() ||
+      asset.assignedTo.toString() === socket.user._id.toString()
+    );
     const isRaisedBy = request.raisedBy.toString() === socket.user._id.toString();
 
     if (isAssigned || isRaisedBy) {

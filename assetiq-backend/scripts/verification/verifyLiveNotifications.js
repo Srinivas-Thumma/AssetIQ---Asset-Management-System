@@ -2,18 +2,16 @@ import http from 'http';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { io as Client } from 'socket.io-client';
-import { connectDB } from '../config/db.js';
-import { env } from '../config/env.js';
-import { initSocket, getIO } from '../config/socket.js';
-import { Organization } from '../models/Organization.js';
-import { User } from '../models/User.js';
-import { Plan } from '../models/Plan.js';
-import { Asset } from '../models/Asset.js';
-import { Warranty } from '../models/Warranty.js';
-import { Notification } from '../models/Notification.js';
+import { connectDB } from '../../src/config/db.js';
+import { env } from '../../src/config/env.js';
+import { initSocket, getIO } from '../../src/config/socket.js';
+import { Organization } from '../../src/models/Organization.js';
+import { User } from '../../src/models/User.js';
+import { Plan } from '../../src/models/Plan.js';
+import { Notification } from '../../src/models/Notification.js';
 
-const runDay2Checkpoint = async () => {
-  console.log('🧪 Starting Day 2 Checkpoint: Real-Time Notifications over WebSockets Test...');
+const runLiveNotificationsVerification = async () => {
+  console.log('🧪 Starting Real-Time Notifications over WebSockets Test...');
   await connectDB();
 
   let plan = await Plan.findOne();
@@ -22,21 +20,21 @@ const runDay2Checkpoint = async () => {
   }
 
   // 1. Provision Test Organizations
-  let orgA = await Organization.findOne({ slug: 'org-a-notif-test' });
+  let orgA = await Organization.findOne({ slug: 'org-a-notif-v-test' });
   if (!orgA) {
-    orgA = await Organization.create({ name: 'Notif Test Org A', slug: 'org-a-notif-test', planId: plan._id });
+    orgA = await Organization.create({ name: 'Notif Test Org A', slug: 'org-a-notif-v-test', planId: plan._id });
   }
 
-  let orgB = await Organization.findOne({ slug: 'org-b-notif-test' });
+  let orgB = await Organization.findOne({ slug: 'org-b-notif-v-test' });
   if (!orgB) {
-    orgB = await Organization.create({ name: 'Notif Test Org B', slug: 'org-b-notif-test', planId: plan._id });
+    orgB = await Organization.create({ name: 'Notif Test Org B', slug: 'org-b-notif-v-test', planId: plan._id });
   }
 
   // 2. Provision Test Users
-  let userA = await User.findOne({ email: 'adminA@orga-notif.com' });
+  let userA = await User.findOne({ email: 'adminA@orga-notif-v.com' });
   if (!userA) {
     userA = await User.create({
-      email: 'adminA@orga-notif.com',
+      email: 'adminA@orga-notif-v.com',
       passwordHash: 'password123',
       role: 'org_admin',
       organizationId: orgA._id,
@@ -44,10 +42,10 @@ const runDay2Checkpoint = async () => {
     });
   }
 
-  let userB = await User.findOne({ email: 'adminB@orgb-notif.com' });
+  let userB = await User.findOne({ email: 'adminB@orgb-notif-v.com' });
   if (!userB) {
     userB = await User.create({
-      email: 'adminB@orgb-notif.com',
+      email: 'adminB@orgb-notif-v.com',
       passwordHash: 'password123',
       role: 'org_admin',
       organizationId: orgB._id,
@@ -131,15 +129,15 @@ const runDay2Checkpoint = async () => {
   await new Promise((resolve) => server.close(resolve));
 
   if (passed) {
-    console.log('\n✅ DAY 2 CHECKPOINT PASSED: Real-time notifications over WebSockets verified with tenant isolation!');
+    console.log('\n✅ VERIFICATION PASSED: Real-time notifications over WebSockets verified with tenant isolation!');
     process.exit(0);
   } else {
-    console.error('\n❌ DAY 2 CHECKPOINT FAILED!');
+    console.error('\n❌ VERIFICATION FAILED!');
     process.exit(1);
   }
 };
 
-runDay2Checkpoint().catch((err) => {
+runLiveNotificationsVerification().catch((err) => {
   console.error('❌ Checkpoint Error:', err);
   process.exit(1);
 });

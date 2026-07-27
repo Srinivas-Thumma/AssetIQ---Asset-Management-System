@@ -17,6 +17,9 @@ import aiRouter from './routes/ai.route.js';
 import reportsRouter from './routes/reports.route.js';
 import adminRouter from './routes/admin.route.js';
 import notificationRouter from './routes/notification.route.js';
+import assetRequestRouter from './routes/assetRequest.route.js';
+import offboardingRouter from './routes/offboarding.route.js';
+import platformBannerRouter from './routes/platformBanner.route.js';
 
 const app = express();
 
@@ -73,6 +76,9 @@ app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/notifications', notificationRouter);
+app.use('/api/v1/asset-requests', assetRequestRouter);
+app.use('/api/v1/offboarding', offboardingRouter);
+app.use('/api/v1/platform', platformBannerRouter);
 
 // Global Error Handler
 app.use(errorHandler);
