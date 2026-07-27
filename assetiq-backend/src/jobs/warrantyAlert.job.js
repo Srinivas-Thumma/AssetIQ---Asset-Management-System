@@ -4,6 +4,7 @@ import { Asset } from '../models/Asset.js';
 import { User } from '../models/User.js';
 import { Notification } from '../models/Notification.js';
 import { runWithTenant } from '../utils/tenantContext.js';
+import { getIO } from '../config/socket.js';
 
 export const startWarrantyJob = () => {
   // Run daily at 01:00 AM
@@ -52,13 +53,21 @@ export const startWarrantyJob = () => {
               });
 
               for (const admin of staffAdmins) {
-                await Notification.create({
+                const notification = await Notification.create({
                   organizationId: warranty.organizationId,
                   userId: admin._id,
                   message: `Warranty for asset "${assetName}" (${assetCode}) expires on ${warranty.endDate.toISOString().split('T')[0]}. Provider: ${warranty.provider}`,
                   type: 'warranty_expiring',
                   relatedId: warranty._id
                 });
+
+                // Emit live notification event via WebSocket to target user room
+                try {
+                  const io = getIO();
+                  io.to(`user:${admin._id.toString()}`).emit('notification:new', notification);
+                } catch (socketErr) {
+                  // Socket server may not be active during standalone CLI checks
+                }
               }
             });
           } catch (err) {

@@ -7,7 +7,9 @@ import {
   createMaintenanceRequest,
   updateMaintenanceRequest,
   deleteMaintenanceRequest,
-  completeMaintenance
+  completeMaintenance,
+  getMaintenanceMessages,
+  createMaintenanceMessage
 } from '../controllers/maintenance.controller.js';
 
 const router = express.Router();
@@ -26,5 +28,9 @@ router.route('/:id')
   .delete(requireRole('org_admin', 'super_admin', 'asset_manager'), deleteMaintenanceRequest);
 
 router.post('/:id/complete', requireRole('org_admin', 'super_admin', 'asset_manager'), completeMaintenance);
+
+router.route('/:id/messages')
+  .get(getMaintenanceMessages)
+  .post(createMaintenanceMessage);
 
 export default router;

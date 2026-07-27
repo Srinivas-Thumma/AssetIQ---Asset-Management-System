@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, AlertCircle, Plus, CheckCircle, Wrench, ShieldAlert, X, Edit, Trash2 } from 'lucide-react';
+import { Calendar, AlertCircle, Plus, CheckCircle, Wrench, ShieldAlert, X, Edit, Trash2, MessageSquare } from 'lucide-react';
+import MaintenanceChatDrawer from '../components/MaintenanceChatDrawer';
 
 export default function Maintenance() {
   const { apiCall, user } = useAuth();
@@ -10,12 +11,13 @@ export default function Maintenance() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Modals state
+  // Modals & Drawers state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editRequestData, setEditRequestData] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [activeChatRequest, setActiveChatRequest] = useState(null);
 
   // New Request Form state
   const [newRequest, setNewRequest] = useState({
@@ -286,6 +288,14 @@ export default function Maintenance() {
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setActiveChatRequest(req)}
+                            title="Open Ticket Chat"
+                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg cursor-pointer transition-colors"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </button>
+
                           {user?.role !== 'employee' && (
                             <>
                               <button
@@ -623,6 +633,14 @@ export default function Maintenance() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Real-time Ticket Chat Drawer */}
+      {activeChatRequest && (
+        <MaintenanceChatDrawer
+          request={activeChatRequest}
+          onClose={() => setActiveChatRequest(null)}
+        />
       )}
     </div>
   );

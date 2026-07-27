@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from './context/AuthContext';
+import { useAuth, AuthProvider } from './context/AuthContext';
+import { SocketProvider, useSocket } from './context/SocketContext';
 import Login from './views/Login';
 import Register from './views/Register';
 import LandingPage from './views/LandingPage';
@@ -19,6 +20,7 @@ import {
 
 function AppContent() {
   const { user, loading, logout, apiCall } = useAuth();
+  const { socket } = useSocket();
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
   // In-app notifications state
@@ -56,7 +58,7 @@ function AppContent() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Fetch in-app notifications
+  // Fetch in-app notifications via REST
   const fetchNotifications = async () => {
     try {
       const res = await apiCall('/api/v1/notifications');
@@ -68,14 +70,30 @@ function AppContent() {
     }
   };
 
-  // Fetch notifications on mount and setup polling intervals
+  // Fetch notifications on mount and setup background polling interval (slowed to 2 minutes as WebSocket fallback)
   useEffect(() => {
     if (user) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
+      const interval = setInterval(fetchNotifications, 120000); // Poll every 2 mins as fallback
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  // Real-time WebSocket Notification Listener
+  useEffect(() => {
+    if (socket) {
+      const handleNewNotification = (newNotification) => {
+        console.log('⚡ Live Notification Received via WebSocket:', newNotification);
+        setNotifications((prev) => [newNotification, ...prev]);
+      };
+
+      socket.on('notification:new', handleNewNotification);
+
+      return () => {
+        socket.off('notification:new', handleNewNotification);
+      };
+    }
+  }, [socket]);
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -342,12 +360,12 @@ function AppContent() {
   );
 }
 
-import { AuthProvider } from './context/AuthContext';
-
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <SocketProvider>
+        <AppContent />
+      </SocketProvider>
     </AuthProvider>
   );
 }

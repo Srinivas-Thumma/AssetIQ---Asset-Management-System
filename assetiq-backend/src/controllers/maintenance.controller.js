@@ -1,5 +1,6 @@
 import { MaintenanceRequest } from '../models/MaintenanceRequest.js';
 import { MaintenanceHistory } from '../models/MaintenanceHistory.js';
+import { MaintenanceMessage } from '../models/MaintenanceMessage.js';
 import { Asset } from '../models/Asset.js';
 import { analyzeAssetHealth } from '../services/ai.service.js';
 import { sendResponse } from '../utils/apiResponse.js';
@@ -168,6 +169,74 @@ export const deleteMaintenanceRequest = async (req, res, next) => {
     }
 
     return sendResponse(res, 200, true, 'Maintenance request deleted successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMaintenanceMessages = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const request = await MaintenanceRequest.findById(id);
+    
+    // Automatic tenant scope check: returns null (404) if request belongs to a different organization
+    if (!request) {
+      return sendResponse(res, 404, false, 'Maintenance request not found');
+    }
+
+    // Role permission check for employees
+    if (req.user.role === 'employee') {
+      const asset = await Asset.findById(request.assetId);
+      const isAssigned = asset && asset.assignedTo && asset.assignedTo.toString() === req.user.employeeId?.toString();
+      const isRaisedBy = request.raisedBy.toString() === req.user._id.toString();
+
+      if (!isAssigned && !isRaisedBy) {
+        return sendResponse(res, 403, false, 'Access denied: You can only view chat messages for your own assigned or raised requests');
+      }
+    }
+
+    const messages = await MaintenanceMessage.find({ requestId: id }).sort({ createdAt: 1 });
+    return sendResponse(res, 200, true, 'Maintenance messages retrieved', messages);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createMaintenanceMessage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return sendResponse(res, 400, false, 'Message content is required');
+    }
+
+    const request = await MaintenanceRequest.findById(id);
+    if (!request) {
+      return sendResponse(res, 404, false, 'Maintenance request not found');
+    }
+
+    // Role permission check for employees
+    if (req.user.role === 'employee') {
+      const asset = await Asset.findById(request.assetId);
+      const isAssigned = asset && asset.assignedTo && asset.assignedTo.toString() === req.user.employeeId?.toString();
+      const isRaisedBy = request.raisedBy.toString() === req.user._id.toString();
+
+      if (!isAssigned && !isRaisedBy) {
+        return sendResponse(res, 403, false, 'Access denied: You can only send messages on your own assigned or raised requests');
+      }
+    }
+
+    const newMessage = await MaintenanceMessage.create({
+      organizationId: req.orgId,
+      requestId: id,
+      senderId: req.user._id,
+      senderName: req.user.email.split('@')[0],
+      senderRole: req.user.role,
+      message: message.trim(),
+    });
+
+    return sendResponse(res, 201, true, 'Maintenance message created', newMessage);
   } catch (error) {
     next(error);
   }

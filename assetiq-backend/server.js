@@ -1,6 +1,8 @@
+import http from 'http';
 import app from './src/app.js';
 import { env } from './src/config/env.js';
 import { connectDB } from './src/config/db.js';
+import { initSocket } from './src/config/socket.js';
 import { startWarrantyJob } from './src/jobs/warrantyAlert.job.js';
 import { startHealthScoreJob } from './src/jobs/healthScore.job.js';
 import { Plan } from './src/models/Plan.js';
@@ -59,10 +61,15 @@ const startServer = async () => {
   startWarrantyJob();
   startHealthScoreJob();
 
-  // 4. Listen
-  app.listen(env.PORT, () => {
+  // 4. Create HTTP Server & Attach Socket.IO Infrastructure
+  const server = http.createServer(app);
+  initSocket(server);
+
+  // 5. Listen
+  server.listen(env.PORT, () => {
     console.log(`🚀 AssetIQ Server running on http://localhost:${env.PORT}`);
     console.log(`📡 Health Check URL: http://localhost:${env.PORT}/health`);
+    console.log(`⚡ Socket.IO Infrastructure active on port ${env.PORT}`);
   });
 };
 
