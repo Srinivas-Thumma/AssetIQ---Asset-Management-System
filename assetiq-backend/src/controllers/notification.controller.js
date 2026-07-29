@@ -39,3 +39,16 @@ export const markAllNotificationsAsRead = async (req, res, next) => {
     next(error);
   }
 };
+
+export const markChatNotificationsAsRead = async (req, res, next) => {
+  try {
+    const { requestId } = req.params;
+    await Notification.updateMany(
+      { userId: req.user._id, relatedId: requestId, read: false },
+      { read: true }
+    );
+    return sendResponse(res, 200, true, 'Chat notifications marked as read', null);
+  } catch (error) {
+    next(error);
+  }
+};

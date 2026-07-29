@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Calendar, ShieldAlert, Plus, ShieldCheck, RefreshCw, X, AlertTriangle, Edit, Trash2 } from 'lucide-react';
+import CustomSelect from '../components/ui/CustomSelect';
 
 export default function Warranties() {
   const { apiCall, user } = useAuth();
@@ -300,17 +301,15 @@ export default function Warranties() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Select Asset</label>
-                <select
-                  required
+                <CustomSelect
+                  placeholder="Select Asset..."
                   value={newWarranty.assetId}
                   onChange={(e) => setNewWarranty({ ...newWarranty, assetId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                >
-                  <option value="">Select Asset...</option>
-                  {assets.map((a) => (
-                    <option key={a._id} value={a._id}>{a.name} ({a.assetCode})</option>
-                  ))}
-                </select>
+                  options={assets.map((a) => ({
+                    value: a._id,
+                    label: `${a.name} (${a.assetCode})`,
+                  }))}
+                />
                 {assets.length === 0 && (
                   <span className="text-[10px] text-slate-400 block mt-1">No unregistered assets available. Create an asset first.</span>
                 )}

@@ -4,7 +4,8 @@ import { tenantScope } from '../middlewares/tenant.middleware.js';
 import {
   getNotifications,
   markNotificationAsRead,
-  markAllNotificationsAsRead
+  markAllNotificationsAsRead,
+  markChatNotificationsAsRead
 } from '../controllers/notification.controller.js';
 
 const router = express.Router();
@@ -16,6 +17,8 @@ router.use(tenantScope);
 router.route('/')
   .get(getNotifications)
   .put(markAllNotificationsAsRead);
+
+router.put('/chat/:requestId', markChatNotificationsAsRead);
 
 router.route('/:id')
   .put(markNotificationAsRead);

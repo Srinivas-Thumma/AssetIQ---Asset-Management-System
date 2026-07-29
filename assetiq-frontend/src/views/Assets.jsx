@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Plus, Search, QrCode, Download, UserCheck, UserMinus, 
   Wrench, Activity, Trash2, Calendar, DollarSign, Tag, MapPin, 
-  HelpCircle, ChevronRight, X, ShieldAlert, Edit
+  HelpCircle, ChevronRight, X, ShieldAlert, Edit, RefreshCw
 } from 'lucide-react';
+import CustomSelect from '../components/ui/CustomSelect';
 
 export default function Assets() {
   const { apiCall, user } = useAuth();
@@ -230,16 +231,36 @@ export default function Assets() {
   };
 
   const handleRetire = async (assetId) => {
-    if (!window.confirm('Are you sure you want to retire this asset? This marks it retired and preserves assignment history.')) return;
+    if (!window.confirm('Are you sure you want to retire this asset? This marks it retired.')) return;
     setActionLoading(true);
     try {
-      const res = await apiCall(`/api/v1/assets/${assetId}`, { method: 'DELETE' });
+      const res = await apiCall(`/api/v1/assets/${assetId}?mode=retire`, { method: 'DELETE' });
       if (res.success) {
         setShowDetailsDrawer(false);
         fetchData();
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteAsset = async (assetId, assetName) => {
+    const nameStr = assetName ? `"${assetName}"` : 'this asset';
+    if (!window.confirm(`Are you sure you want to permanently delete ${nameStr}? This will completely remove it from the system.`)) return;
+    setActionLoading(true);
+    try {
+      const res = await apiCall(`/api/v1/assets/${assetId}`, { method: 'DELETE' });
+      if (res.success) {
+        setShowDetailsDrawer(false);
+        fetchData();
+      } else {
+        alert(res.message || 'Failed to delete asset');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting asset');
     } finally {
       setActionLoading(false);
     }
@@ -308,29 +329,29 @@ export default function Assets() {
         </div>
 
         <div className="flex gap-4 w-full md:w-auto">
-          <select
+          <CustomSelect
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-700 text-sm focus:outline-none w-full md:w-44"
-          >
-            <option value="">All Statuses</option>
-            <option value="available">Available</option>
-            <option value="assigned">Assigned</option>
-            <option value="under_maintenance">In Repair</option>
-            <option value="damaged">Damaged</option>
-            <option value="retired">Retired</option>
-          </select>
+            options={[
+              { value: '', label: 'All Statuses' },
+              { value: 'available', label: 'Available' },
+              { value: 'assigned', label: 'Assigned' },
+              { value: 'under_maintenance', label: 'In Repair' },
+              { value: 'damaged', label: 'Damaged' },
+              { value: 'retired', label: 'Retired' },
+            ]}
+            className="w-full md:w-44"
+          />
 
-          <select
+          <CustomSelect
             value={catFilter}
             onChange={(e) => setCatFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-700 text-sm focus:outline-none w-full md:w-44"
-          >
-            <option value="">All Categories</option>
-            {categories.map((c) => (
-              <option key={c._id} value={c._id}>{c.name}</option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'All Categories' },
+              ...categories.map((c) => ({ value: c._id, label: c.name })),
+            ]}
+            className="w-full md:w-44"
+          />
         </div>
       </div>
 
@@ -410,6 +431,16 @@ export default function Assets() {
                               className="p-2 hover:bg-slate-100 text-slate-600 rounded-lg cursor-pointer"
                             >
                               <Edit className="h-4 w-4" />
+                            </button>
+                          )}
+
+                          {user?.role !== 'employee' && (
+                            <button
+                              onClick={() => handleDeleteAsset(asset._id, asset.name)}
+                              title="Delete Asset"
+                              className="p-2 hover:bg-red-50 text-red-600 rounded-lg cursor-pointer"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           )}
                           
@@ -497,33 +528,24 @@ export default function Assets() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Category</label>
-                  <select
-                    required
+                  <CustomSelect
+                    placeholder="Select Category"
                     value={newAsset.categoryId}
                     onChange={(e) => setNewAsset({ ...newAsset, categoryId: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((c) => (
-                      <option key={c._id} value={c._id}>{c.name}</option>
-                    ))}
-                  </select>
+                    options={categories.map((c) => ({ value: c._id, label: c.name }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Room Location</label>
-                  <select
-                    required
+                  <CustomSelect
+                    placeholder="Select Room"
                     value={newAsset.roomId}
                     onChange={(e) => setNewAsset({ ...newAsset, roomId: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                  >
-                    <option value="">Select Room</option>
-                    {rooms.map((r) => (
-                      <option key={r._id} value={r._id}>
-                        {r.name} - {r.floorId?.name} ({r.floorId?.buildingId?.name})
-                      </option>
-                    ))}
-                  </select>
+                    options={rooms.map((r) => ({
+                      value: r._id,
+                      label: `${r.name} - ${r.floorId?.name || ''} (${r.floorId?.buildingId?.name || ''})`,
+                    }))}
+                  />
                 </div>
               </div>
 
@@ -553,17 +575,12 @@ export default function Assets() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor Provider</label>
-                <select
-                  required
+                <CustomSelect
+                  placeholder="Select Supplier"
                   value={newAsset.vendorId}
                   onChange={(e) => setNewAsset({ ...newAsset, vendorId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                >
-                  <option value="">Select Supplier</option>
-                  {vendors.map((v) => (
-                    <option key={v._id} value={v._id}>{v.name}</option>
-                  ))}
-                </select>
+                  options={vendors.map((v) => ({ value: v._id, label: v.name }))}
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -616,50 +633,36 @@ export default function Assets() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Category</label>
-                  <select
-                    required
+                  <CustomSelect
+                    placeholder="Select Category"
                     value={editAssetData.categoryId}
                     onChange={(e) => setEditAssetData({ ...editAssetData, categoryId: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((c) => (
-                      <option key={c._id} value={c._id}>{c.name}</option>
-                    ))}
-                  </select>
+                    options={categories.map((c) => ({ value: c._id, label: c.name }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Room Location</label>
-                  <select
-                    required
+                  <CustomSelect
+                    placeholder="Select Room"
                     value={editAssetData.roomId}
                     onChange={(e) => setEditAssetData({ ...editAssetData, roomId: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                  >
-                    <option value="">Select Room</option>
-                    {rooms.map((r) => (
-                      <option key={r._id} value={r._id}>
-                        {r.name} - {r.floorId?.name} ({r.floorId?.buildingId?.name})
-                      </option>
-                    ))}
-                  </select>
+                    options={rooms.map((r) => ({
+                      value: r._id,
+                      label: `${r.name} - ${r.floorId?.name || ''} (${r.floorId?.buildingId?.name || ''})`,
+                    }))}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor</label>
-                  <select
-                    required
+                  <CustomSelect
+                    placeholder="Select Vendor"
                     value={editAssetData.vendorId}
                     onChange={(e) => setEditAssetData({ ...editAssetData, vendorId: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                  >
-                    <option value="">Select Vendor</option>
-                    {vendors.map((v) => (
-                      <option key={v._id} value={v._id}>{v.name}</option>
-                    ))}
-                  </select>
+                    options={vendors.map((v) => ({ value: v._id, label: v.name }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Purchase Price ($)</label>
@@ -677,18 +680,17 @@ export default function Assets() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Operational Status</label>
-                <select
-                  required
+                <CustomSelect
                   value={editAssetData.status}
                   onChange={(e) => setEditAssetData({ ...editAssetData, status: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none capitalize"
-                >
-                  <option value="available">Available</option>
-                  <option value="assigned">Assigned</option>
-                  <option value="under_maintenance">In Repair (Under Maintenance)</option>
-                  <option value="damaged">Damaged</option>
-                  <option value="retired">Retired</option>
-                </select>
+                  options={[
+                    { value: 'available', label: 'Available' },
+                    { value: 'assigned', label: 'Assigned' },
+                    { value: 'under_maintenance', label: 'In Repair (Under Maintenance)' },
+                    { value: 'damaged', label: 'Damaged' },
+                    { value: 'retired', label: 'Retired' },
+                  ]}
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -724,15 +726,15 @@ export default function Assets() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Select Employee</label>
-                <select
+                <CustomSelect
+                  placeholder="Select Employee..."
                   value={selectedEmployeeId}
                   onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                >
-                  {employees.map((emp) => (
-                    <option key={emp._id} value={emp._id}>{emp.name} ({emp.departmentId?.name})</option>
-                  ))}
-                </select>
+                  options={employees.map((emp) => ({
+                    value: emp._id,
+                    label: `${emp.name} (${emp.departmentId?.name || 'Unassigned'})`,
+                  }))}
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -755,273 +757,367 @@ export default function Assets() {
         </div>
       )}
 
-      {/* Details Side Drawer */}
+      {/* Details Wide 3-Column Centered Popup Modal */}
       {showDetailsDrawer && selectedAsset && (
-        <div className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs flex justify-end">
-          <div className="w-full max-w-lg bg-white h-full shadow-2xl border-l border-slate-100 flex flex-col relative overflow-y-auto animate-slide-in">
-            {/* Header */}
-            <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <div>
-                <span className="text-xs font-bold font-mono text-slate-400">{selectedAsset.assetCode}</span>
-                <h3 className="text-xl font-bold text-slate-800 mt-1">{selectedAsset.name}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/65 backdrop-blur-sm animate-fade-in">
+          <div className="w-[95vw] max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden max-h-[92vh] animate-fade-in">
+            
+            {/* 1. Header (Pinned Top) */}
+            <div className="px-6 py-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <span className="px-2.5 py-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-mono font-bold">
+                  {selectedAsset.assetCode}
+                </span>
+                <div>
+                  <h3 className="text-lg font-bold text-white tracking-tight">{selectedAsset.name}</h3>
+                </div>
               </div>
-              <button onClick={() => setShowDetailsDrawer(false)} className="text-slate-400 hover:text-slate-600"><X className="h-6 w-6" /></button>
+              <button 
+                onClick={() => setShowDetailsDrawer(false)} 
+                className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            {/* Content Body */}
-            <div className="p-6 space-y-6 flex-1">
-              {/* QR and Status Card */}
-              <div className="flex items-center gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                {selectedAsset.qrCode ? (
-                  <img src={selectedAsset.qrCode} alt="QR Code" className="w-24 h-24 bg-white p-1.5 border border-slate-200 rounded-lg shadow-sm" />
-                ) : (
-                  <div className="w-24 h-24 bg-slate-200 rounded-lg" />
-                )}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400 font-semibold uppercase">Status:</span>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold border bg-white capitalize">{selectedAsset.status}</span>
-                  </div>
-                  {selectedAsset.assignedTo && (
-                    <div className="text-xs text-slate-600">
-                      <span className="font-semibold text-slate-500">Custodian:</span> {selectedAsset.assignedTo.name} ({selectedAsset.assignedTo.email})
+            {/* 2. Grid Body (3-Column Layout, No Overall Modal Scroll needed on standard displays) */}
+            <div className="p-5 grid grid-cols-1 xl:grid-cols-12 gap-4 flex-1 min-h-0 overflow-y-auto xl:overflow-visible bg-slate-50/40">
+              
+              {/* --- COLUMN 1 (LEFT): QR, Custodian & Specifications --- */}
+              <div className="xl:col-span-3 space-y-4 flex flex-col">
+                
+                {/* QR & Status Card */}
+                <div className="bg-white border border-indigo-100/80 rounded-2xl p-4 shadow-2xs flex flex-col items-center text-center space-y-3">
+                  {selectedAsset.qrCode ? (
+                    <img 
+                      src={selectedAsset.qrCode} 
+                      alt="QR Code" 
+                      className="w-28 h-28 bg-white p-2 border border-slate-200 rounded-xl shadow-xs shrink-0" 
+                    />
+                  ) : (
+                    <div className="w-28 h-28 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-mono text-xs">
+                      No QR
                     </div>
                   )}
-                  <button
-                    onClick={() => downloadQR(selectedAsset)}
-                    className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 shadow-xs cursor-pointer transition-colors"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download QR Code
-                  </button>
+
+                  <div className="space-y-1.5 w-full">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Status:</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-indigo-50/50 text-indigo-700 border-indigo-100 capitalize">
+                        {selectedAsset.status?.replace('_', ' ')}
+                      </span>
+                    </div>
+
+                    {selectedAsset.assignedTo && (
+                      <div className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100 text-left">
+                        <span className="font-bold text-slate-500 block text-[9px] uppercase tracking-wider">Current Custodian</span>
+                        <p className="font-semibold text-slate-800 truncate">{selectedAsset.assignedTo.name}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{selectedAsset.assignedTo.email}</p>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => downloadQR(selectedAsset)}
+                      className="w-full flex items-center justify-center gap-1.5 text-xs text-slate-700 font-bold px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download QR Code
+                    </button>
+                  </div>
                 </div>
+
+                {/* Specifications Card */}
+                <div className="bg-white border border-indigo-100/80 rounded-2xl p-4 shadow-2xs space-y-3 flex-1 flex flex-col">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+                    Specifications & Identity
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs flex-1">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase block">Purchase Cost</span>
+                      <span className="font-extrabold text-slate-900 text-xs">${selectedAsset.purchasePrice}</span>
+                    </div>
+
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase block">Purchase Date</span>
+                      <span className="font-bold text-slate-800 text-xs">
+                        {selectedAsset.purchaseDate ? new Date(selectedAsset.purchaseDate).toISOString().split('T')[0] : 'N/A'}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase block">Category</span>
+                      <span className="font-bold text-slate-800 text-xs truncate block">
+                        {selectedAsset.categoryId?.name || 'Standard'}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase block">Room / Location</span>
+                      <span className="font-bold text-slate-800 text-xs truncate block">
+                        {selectedAsset.roomId?.name || 'Unassigned'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedAsset.vendorId && (
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase block">Vendor</span>
+                      <span className="font-bold text-slate-800 text-xs truncate block">{selectedAsset.vendorId.name}</span>
+                    </div>
+                  )}
+                </div>
+
               </div>
 
-              {/* AI Health Diagnostics Pane */}
-              <div className="bg-white border-2 border-blue-600/25 rounded-2xl p-5 shadow-sm text-slate-800 space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
-                      <Activity className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-semibold tracking-wide text-slate-700">AI Health Diagnostics</span>
-                  </div>
-                  {user?.role !== 'employee' && (
-                    <button
-                      onClick={() => handleTriggerAI(selectedAsset._id)}
-                      disabled={actionLoading}
-                      className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold px-3 py-1.5 border border-blue-100 rounded-lg shadow-xs cursor-pointer transition-all disabled:opacity-50"
-                    >
-                      {actionLoading ? 'Analyzing...' : 'Recalculate AI'}
-                    </button>
-                  )}
-                </div>
 
-                <div className="flex items-center gap-6 py-2">
-                  <div className="relative flex items-center justify-center">
-                    {/* Ring score */}
-                    <div className="text-3xl font-extrabold text-blue-600">{selectedAsset.ai?.healthScore ?? 100}%</div>
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-500 uppercase tracking-wider block font-semibold">Diagnostic Score</span>
-                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                      Calculated on-demand or nightly based on age, category metrics, and total repair history.
-                    </p>
-                  </div>
-                </div>
-
-                {/* AI Predictions */}
-                {selectedAsset.ai?.predictedNextMaintenanceDate && (
-                  <div className="space-y-4 border-t border-slate-100 pt-4 text-xs">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-0.5">Predicted Maintenance</span>
-                        <p className="font-bold text-slate-800">
-                          {new Date(selectedAsset.ai.predictedNextMaintenanceDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
-                        </p>
+              {/* --- COLUMN 2 (MIDDLE - FEATURE CENTERPIECE): AI HEALTH DIAGNOSTICS --- */}
+              <div className="xl:col-span-5 flex flex-col">
+                <div className="bg-white border-2 border-indigo-500/25 rounded-2xl p-5 shadow-sm space-y-4 flex-1 flex flex-col">
+                  
+                  {/* Top Bar */}
+                  <div className="flex justify-between items-center border-b border-indigo-50 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <Activity className="h-4 w-4" />
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-0.5">Failure Risk Probability</span>
-                        <p className={`font-bold ${
-                          selectedAsset.ai.failureRiskPercent > 70 ? 'text-red-650' :
-                          selectedAsset.ai.failureRiskPercent > 40 ? 'text-amber-650' :
-                          'text-emerald-600'
-                        }`}>
-                          {selectedAsset.ai.failureRiskPercent}% Risk
-                        </p>
+                        <h4 className="text-sm font-bold text-slate-900 tracking-tight">AI Health Diagnostics</h4>
+                        <p className="text-[10px] text-slate-400 font-medium">Real-time predictive telemetry</p>
                       </div>
                     </div>
+                    {user?.role !== 'employee' && (
+                      <button
+                        onClick={() => handleTriggerAI(selectedAsset._id)}
+                        disabled={actionLoading}
+                        className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-1.5 border border-indigo-150 rounded-xl shadow-2xs cursor-pointer transition-all disabled:opacity-50"
+                      >
+                        {actionLoading ? 'Analyzing...' : 'Recalculate AI'}
+                      </button>
+                    )}
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedAsset.ai.remainingUsefulLifeMonths !== undefined && selectedAsset.ai.remainingUsefulLifeMonths !== null && (
-                        <div>
-                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-0.5">Remaining Useful Life</span>
-                          <p className="font-bold text-slate-800">
-                            {selectedAsset.ai.remainingUsefulLifeMonths} months
-                          </p>
-                        </div>
-                      )}
-                      {selectedAsset.ai.priority && (
-                        <div>
-                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-0.5">Urgency Priority</span>
-                          <p className={`font-bold ${
-                            selectedAsset.ai.priority.toLowerCase() === 'critical' || selectedAsset.ai.priority.toLowerCase() === 'high' ? 'text-red-600' :
-                            selectedAsset.ai.priority.toLowerCase() === 'medium' ? 'text-amber-600' :
-                            'text-slate-700'
-                          }`}>
-                            {selectedAsset.ai.priority}
-                          </p>
-                        </div>
-                      )}
+                  {/* Score Highlight Banner */}
+                  <div className="flex items-center gap-5 bg-gradient-to-br from-indigo-50/70 to-slate-50 p-4 rounded-2xl border border-indigo-100/60">
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-2xl shadow-md shadow-indigo-600/20">
+                        {selectedAsset.ai?.healthScore ?? 100}%
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-indigo-900 font-bold uppercase tracking-wider block">Health Score Metric</span>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                        Calculated via telemetry analysis of asset age, component degradation, and repair logs.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* AI Predictions Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold mb-0.5">Predicted Maintenance</span>
+                      <p className="font-bold text-slate-800 text-xs">
+                        {selectedAsset.ai?.predictedNextMaintenanceDate 
+                          ? new Date(selectedAsset.ai.predictedNextMaintenanceDate).toLocaleDateString(undefined, { dateStyle: 'medium' })
+                          : 'No action due'}
+                      </p>
                     </div>
 
-                    {selectedAsset.ai.replacementRecommendation && (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold mb-0.5">Failure Risk</span>
+                      <p className={`font-extrabold text-xs ${
+                        selectedAsset.ai?.failureRiskPercent > 70 ? 'text-red-650' :
+                        selectedAsset.ai?.failureRiskPercent > 40 ? 'text-amber-650' :
+                        'text-emerald-600'
+                      }`}>
+                        {selectedAsset.ai?.failureRiskPercent ?? 0}% Risk
+                      </p>
+                    </div>
+
+                    {selectedAsset.ai?.remainingUsefulLifeMonths !== undefined && selectedAsset.ai?.remainingUsefulLifeMonths !== null && (
                       <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold mb-1">Replacement Recommendation</span>
-                        <p className="text-slate-700 leading-relaxed font-medium">
-                          {selectedAsset.ai.replacementRecommendation}
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold mb-0.5">Useful Life Left</span>
+                        <p className="font-bold text-slate-800 text-xs">
+                          {selectedAsset.ai.remainingUsefulLifeMonths} months
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedAsset.ai?.priority && (
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold mb-0.5">Urgency Priority</span>
+                        <p className={`font-bold text-xs ${
+                          ['critical', 'high'].includes(selectedAsset.ai.priority.toLowerCase()) ? 'text-red-600' :
+                          selectedAsset.ai.priority.toLowerCase() === 'medium' ? 'text-amber-600' :
+                          'text-slate-700'
+                        }`}>
+                          {selectedAsset.ai.priority}
                         </p>
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Insights List */}
-                <div className="space-y-2 border-t border-slate-100 pt-4">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Insights & Warnings</span>
-                  {selectedAsset.ai?.insights && selectedAsset.ai.insights.length > 0 ? (
-                    <ul className="space-y-2.5 mt-2">
-                      {selectedAsset.ai.insights.map((insight, idx) => (
-                        <li key={idx} className="flex gap-2 items-start text-xs text-slate-650 leading-relaxed">
-                          <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-650 shrink-0" />
-                          {insight}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-xs text-slate-500 italic mt-1">No AI insights generated yet. Click Recalculate to generate details.</div>
+                  {/* AI Replacement Recommendation */}
+                  {selectedAsset.ai?.replacementRecommendation && (
+                    <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/60 text-xs">
+                      <span className="text-[10px] text-amber-800 uppercase tracking-wider block font-bold mb-0.5">Replacement Recommendation</span>
+                      <p className="text-amber-900 leading-relaxed text-[11px] font-medium">
+                        {selectedAsset.ai.replacementRecommendation}
+                      </p>
+                    </div>
                   )}
+
+                  {/* AI Insights & Warnings List */}
+                  <div className="space-y-2 flex-1 flex flex-col min-h-0 pt-1">
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">AI Insights & Warnings</span>
+                    <div className="flex-1 overflow-y-auto max-h-36 pr-1 space-y-2 text-xs">
+                      {selectedAsset.ai?.insights && selectedAsset.ai.insights.length > 0 ? (
+                        <ul className="space-y-2">
+                          {selectedAsset.ai.insights.map((insight, idx) => (
+                            <li key={idx} className="flex gap-2 items-start text-[11px] text-slate-700 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
+                              <span className="mt-1 w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
+                              <span>{insight}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-xs text-slate-400 italic">No AI insights generated yet. Click Recalculate AI above.</div>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
-              {/* General details list */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-bold text-slate-800">Specifications</h4>
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="text-slate-400 font-semibold block mb-1">Purchase Cost</span>
-                    <span className="font-bold text-slate-800 text-sm">${selectedAsset.purchasePrice}</span>
-                  </div>
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="text-slate-400 font-semibold block mb-1">Purchase Date</span>
-                    <span className="font-bold text-slate-800 text-sm">{new Date(selectedAsset.purchaseDate).toISOString().split('T')[0]}</span>
+
+              {/* --- COLUMN 3 (RIGHT): ASSIGNMENT HISTORY & COMPLETED REPAIR LOGS --- */}
+              <div className="xl:col-span-4 space-y-4 flex flex-col">
+                
+                {/* Assignment History Card */}
+                <div className="bg-white border border-indigo-100/80 rounded-2xl p-4 shadow-2xs flex flex-col max-h-52">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2 mb-2 shrink-0">
+                    Assignment History
+                  </h4>
+                  <div className="overflow-y-auto flex-1 pr-1 space-y-2.5">
+                    {(!detailHistory?.assignments || detailHistory.assignments.length === 0) ? (
+                      <div className="text-xs text-slate-400 italic py-2">No historical handover records.</div>
+                    ) : (
+                      detailHistory.assignments.map((log) => (
+                        <div key={log._id} className="flex justify-between items-center text-xs border-b border-slate-50 pb-2">
+                          <div>
+                            <span className="font-bold text-slate-800">{log.employeeId?.name || 'Custodian'}</span>
+                            <span className="text-slate-400 text-[10px] block">
+                              Assigned: {log.assignedAt ? new Date(log.assignedAt).toISOString().split('T')[0] : 'N/A'}
+                            </span>
+                          </div>
+                          <div>
+                            {log.returnedAt ? (
+                              <span className="text-slate-400 text-[10px]">Returned: {new Date(log.returnedAt).toISOString().split('T')[0]}</span>
+                            ) : (
+                              <span className="text-blue-600 font-bold px-2 py-0.5 bg-blue-50 border border-blue-100 rounded-full text-[10px]">Active</span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
+
+                {/* Completed Repair Logs Card */}
+                <div className="bg-white border border-indigo-100/80 rounded-2xl p-4 shadow-2xs flex-1 flex flex-col max-h-56">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2 mb-2 shrink-0">
+                    Completed Repair Logs
+                  </h4>
+                  <div className="overflow-y-auto flex-1 pr-1 space-y-2.5">
+                    {(!detailHistory?.maintenance || detailHistory.maintenance.length === 0) ? (
+                      <div className="text-xs text-slate-400 italic py-2">No recorded repair history.</div>
+                    ) : (
+                      detailHistory.maintenance.map((log) => (
+                        <div key={log._id} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs space-y-1">
+                          <div className="flex justify-between font-bold text-slate-800">
+                            <span>Cost: ${log.cost}</span>
+                            <span className="text-slate-400 text-[10px] font-normal">{log.date ? new Date(log.date).toISOString().split('T')[0] : 'N/A'}</span>
+                          </div>
+                          <p className="text-slate-600 text-[11px] leading-relaxed"><span className="font-semibold text-slate-700">Findings:</span> {log.findings}</p>
+                          <p className="text-slate-600 text-[11px] leading-relaxed"><span className="font-semibold text-slate-700">Actions:</span> {log.actionsTaken}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
               </div>
 
-              {/* History logs tabs */}
-              <div className="space-y-4 border-t border-slate-100 pt-6">
-                <h4 className="text-sm font-bold text-slate-800">Assignment History</h4>
-                {detailHistory.assignments.length === 0 ? (
-                  <div className="text-xs text-slate-400 italic">No historical handover records.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {detailHistory.assignments.map((log) => (
-                      <div key={log._id} className="flex justify-between items-center text-xs border-b border-slate-50 pb-2">
-                        <div>
-                          <span className="font-semibold text-slate-700">{log.employeeId?.name || 'Custodian'}</span>
-                          <span className="text-slate-400 text-[10px] block">
-                            Assigned: {new Date(log.assignedAt).toISOString().split('T')[0]} by {log.assignedBy?.email || 'Admin'}
-                          </span>
-                        </div>
-                        <div>
-                          {log.returnedAt ? (
-                            <span className="text-slate-400">Returned: {new Date(log.returnedAt).toISOString().split('T')[0]}</span>
-                          ) : (
-                            <span className="text-blue-600 font-bold px-2 py-0.5 bg-blue-50 border border-blue-100 rounded-full text-[10px]">Active</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Maintenance History logs */}
-              <div className="space-y-4 border-t border-slate-100 pt-6">
-                <h4 className="text-sm font-bold text-slate-800">Completed Repair Logs</h4>
-                {detailHistory.maintenance.length === 0 ? (
-                  <div className="text-xs text-slate-400 italic">No recorded repair history.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {detailHistory.maintenance.map((log) => (
-                      <div key={log._id} className="border-b border-slate-50 pb-2 text-xs">
-                        <div className="flex justify-between font-semibold text-slate-700">
-                          <span>Cost: ${log.cost}</span>
-                          <span className="text-slate-400">{new Date(log.date).toISOString().split('T')[0]}</span>
-                        </div>
-                        <p className="text-slate-500 mt-1 text-[11px] leading-relaxed"><span className="font-semibold">Findings:</span> {log.findings}</p>
-                        <p className="text-slate-500 mt-0.5 text-[11px] leading-relaxed"><span className="font-semibold">Actions:</span> {log.actionsTaken}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
-            {/* Footer buttons */}
+            {/* 3. Footer Bar (Pinned Bottom Bar, Always Visible) */}
             {user?.role !== 'employee' && (
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center gap-4 shrink-0">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleRetire(selectedAsset._id)}
-                    disabled={actionLoading}
-                    className="flex items-center gap-1.5 text-xs text-red-650 hover:text-red-700 font-bold px-3 py-2 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Retire
-                  </button>
+              <div className="px-6 py-3.5 bg-slate-900 text-white border-t border-slate-800 flex justify-between items-center gap-4 shrink-0">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleOpenEdit(selectedAsset)}
                     disabled={actionLoading}
-                    className="flex items-center gap-1.5 text-xs text-blue-650 hover:text-blue-700 font-bold px-3 py-2 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1.5 text-xs text-blue-300 hover:text-white font-bold px-3 py-2 border border-blue-500/30 bg-blue-600/20 hover:bg-blue-600/40 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
                   >
                     <Edit className="h-3.5 w-3.5" />
-                    Edit
+                    Edit Asset
                   </button>
+
                   {selectedAsset.status !== 'damaged' && selectedAsset.status !== 'retired' && (
                     <button
                       onClick={() => handleMarkDamaged(selectedAsset._id)}
                       disabled={actionLoading}
-                      className="flex items-center gap-1.5 text-xs text-amber-650 hover:text-amber-700 font-bold px-3 py-2 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-1.5 text-xs text-amber-300 hover:text-white font-bold px-3 py-2 border border-amber-500/30 bg-amber-600/20 hover:bg-amber-600/40 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
                     >
                       <ShieldAlert className="h-3.5 w-3.5" />
                       Mark Damaged
                     </button>
                   )}
+
+                  <button
+                    onClick={() => handleRetire(selectedAsset._id)}
+                    disabled={actionLoading}
+                    className="flex items-center gap-1.5 text-xs text-amber-300 hover:text-white font-bold px-3 py-2 border border-amber-500/30 bg-amber-600/20 hover:bg-amber-600/40 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Retire Asset
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteAsset(selectedAsset._id, selectedAsset.name)}
+                    disabled={actionLoading}
+                    className="flex items-center gap-1.5 text-xs text-red-300 hover:text-white font-bold px-3 py-2 border border-red-500/30 bg-red-600/20 hover:bg-red-600/40 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Asset
+                  </button>
                 </div>
-                {selectedAsset.status === 'assigned' && (
-                  <button
-                    onClick={() => handleReturn(selectedAsset)}
-                    disabled={actionLoading}
-                    className="flex items-center gap-1.5 text-xs text-slate-700 hover:text-slate-900 font-bold px-4 py-2 border border-slate-200 bg-white hover:bg-slate-100 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
-                  >
-                    <UserMinus className="h-4 w-4" />
-                    Return Asset
-                  </button>
-                )}
-                {selectedAsset.status === 'available' && (
-                  <button
-                    onClick={() => handleOpenAssign(selectedAsset)}
-                    disabled={actionLoading}
-                    className="flex items-center gap-1.5 text-xs text-white font-bold px-5 py-2.5 bg-slate-900 hover:bg-slate-800 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
-                  >
-                    <UserCheck className="h-4 w-4" />
-                    Assign Asset
-                  </button>
-                )}
+
+                <div>
+                  {selectedAsset.status === 'assigned' && (
+                    <button
+                      onClick={() => handleReturn(selectedAsset)}
+                      disabled={actionLoading}
+                      className="flex items-center gap-1.5 text-xs text-slate-200 hover:text-white font-bold px-4 py-2 border border-slate-700 bg-slate-800 hover:bg-slate-700 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
+                    >
+                      <UserMinus className="h-4 w-4" />
+                      Return Custody
+                    </button>
+                  )}
+                  {selectedAsset.status === 'available' && (
+                    <button
+                      onClick={() => handleOpenAssign(selectedAsset)}
+                      disabled={actionLoading}
+                      className="flex items-center gap-1.5 text-xs text-white font-bold px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl cursor-pointer disabled:opacity-50 transition-colors shadow-md shadow-blue-600/20"
+                    >
+                      <UserCheck className="h-4 w-4" />
+                      Assign Custody
+                    </button>
+                  )}
+                </div>
               </div>
             )}
+
           </div>
         </div>
       )}

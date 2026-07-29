@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   GitCommit, Building2, Layers, MapPin, Plus, 
-  RefreshCw, X, ChevronDown, ChevronRight, Edit2, Trash2 
+  RefreshCw, X, ChevronDown, ChevronRight, Edit2, Trash2,
+  Package, Eye, CheckCircle2
 } from 'lucide-react';
 
 export default function Locations() {
@@ -14,6 +15,12 @@ export default function Locations() {
   // Collapse state for nodes
   const [expandedNodes, setExpandedNodes] = useState({});
 
+  // Room Assets Modal State
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [roomAssets, setRoomAssets] = useState([]);
+  const [roomAssetsLoading, setRoomAssetsLoading] = useState(false);
+  const [showRoomAssetsModal, setShowRoomAssetsModal] = useState(false);
+
   // Modal controls
   const [activeModal, setActiveModal] = useState(null); // 'branch'|'building'|'floor'|'room'|'edit_branch'|'edit_building'|'edit_floor'|'edit_room'
   const [parentId, setParentId] = useState('');
@@ -24,6 +31,23 @@ export default function Locations() {
   const [formData, setFormData] = useState({ name: '', code: '', number: 0 });
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const handleOpenRoomAssets = async (room) => {
+    setSelectedRoom(room);
+    setShowRoomAssetsModal(true);
+    setRoomAssetsLoading(true);
+    setRoomAssets([]);
+    try {
+      const res = await apiCall(`/api/v1/assets?roomId=${room._id}`);
+      if (res.success) {
+        setRoomAssets(res.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch room assets:', err);
+    } finally {
+      setRoomAssetsLoading(false);
+    }
+  };
 
   const fetchTree = async () => {
     setRefreshing(true);
@@ -72,13 +96,15 @@ export default function Locations() {
     setActiveModal(`edit_${type}`);
   };
 
+  const getPluralPath = (type) => (type === 'branch' ? 'branches' : `${type}s`);
+
   const handleDeleteNode = async (type, id) => {
     if (user?.role === 'employee') return;
     if (!window.confirm(`Are you sure you want to delete this ${type}? This action cannot be undone.`)) return;
 
     setRefreshing(true);
     try {
-      const res = await apiCall(`/api/v1/locations/${type}s/${id}`, {
+      const res = await apiCall(`/api/v1/locations/${getPluralPath(type)}/${id}`, {
         method: 'DELETE'
       });
 
@@ -106,17 +132,18 @@ export default function Locations() {
 
     const isEdit = activeModal.startsWith('edit_');
     const type = isEdit ? activeModal.replace('edit_', '') : activeModal;
+    const endpointPath = getPluralPath(type);
 
     if (isEdit) {
       method = 'PUT';
-      url = `/api/v1/locations/${type}s/${editId}`;
+      url = `/api/v1/locations/${endpointPath}/${editId}`;
       if (type === 'floor') {
         body = { name: formData.name, number: Number(formData.number) };
       } else {
         body = { name: formData.name, code: formData.code };
       }
     } else {
-      url = `/api/v1/locations/${type}s`;
+      url = `/api/v1/locations/${endpointPath}`;
       if (type === 'branch') {
         body = { name: formData.name, code: formData.code };
       } else if (type === 'building') {
@@ -347,24 +374,35 @@ export default function Locations() {
                                                         <span className="text-[9px] font-mono text-slate-455 block truncate">{room.code}</span>
                                                       </div>
                                                     </div>
-                                                    {user?.role !== 'employee' && (
-                                                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1.5 shrink-0">
-                                                        <button
-                                                          onClick={() => handleOpenEditModal('room', room)}
-                                                          className="p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
-                                                          title="Edit Room"
-                                                        >
-                                                          <Edit2 className="h-3 w-3" />
-                                                        </button>
-                                                        <button
-                                                          onClick={() => handleDeleteNode('room', room._id)}
-                                                          className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
-                                                          title="Delete Room"
-                                                        >
-                                                          <Trash2 className="h-3 w-3" />
-                                                        </button>
-                                                      </div>
-                                                    )}
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                      <button
+                                                        onClick={() => handleOpenRoomAssets(room)}
+                                                        className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-150 text-blue-700 text-[10px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                                        title="Show assets held in this room"
+                                                      >
+                                                        <Package className="h-3 w-3" />
+                                                        Assets
+                                                      </button>
+
+                                                      {user?.role !== 'employee' && (
+                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-0.5">
+                                                          <button
+                                                            onClick={() => handleOpenEditModal('room', room)}
+                                                            className="p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
+                                                            title="Edit Room"
+                                                          >
+                                                            <Edit2 className="h-3 w-3" />
+                                                          </button>
+                                                          <button
+                                                            onClick={() => handleDeleteNode('room', room._id)}
+                                                            className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                                                            title="Delete Room"
+                                                          >
+                                                            <Trash2 className="h-3 w-3" />
+                                                          </button>
+                                                        </div>
+                                                      )}
+                                                    </div>
                                                   </div>
                                                 ))
                                               )}
@@ -478,6 +516,89 @@ export default function Locations() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ROOM HELD ASSETS MODAL --- */}
+      {showRoomAssetsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-slate-100 overflow-hidden max-h-[85vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600/30 rounded-xl text-blue-400">
+                  <Package className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">
+                    Room Inventory: {selectedRoom?.name}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Room Code: {selectedRoom?.code}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRoomAssetsModal(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {roomAssetsLoading ? (
+              <div className="p-12 flex justify-center items-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-6 space-y-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs font-semibold text-slate-700 shrink-0">
+                  <span>Room Allocation Status:</span>
+                  <span className="font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
+                    {roomAssets.length} Assets Currently Held
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto min-h-0 border border-slate-200 rounded-2xl bg-white shadow-2xs">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
+                        <th className="py-3 px-4">Asset Code</th>
+                        <th className="py-3 px-4">Asset Name</th>
+                        <th className="py-3 px-4">Category</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4">Assigned Employee</th>
+                        <th className="py-3 px-4 text-right">Value ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {roomAssets.map((asset) => (
+                        <tr key={asset._id} className="hover:bg-slate-50">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-800">{asset.assetCode}</td>
+                          <td className="py-3 px-4 font-semibold text-slate-900">{asset.name}</td>
+                          <td className="py-3 px-4 text-slate-500">{asset.categoryId?.name || 'Standard'}</td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
+                              {asset.status.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-600">
+                            {asset.assignedTo ? `${asset.assignedTo.firstName || ''} ${asset.assignedTo.lastName || ''}`.trim() || asset.assignedTo.email : 'Unassigned'}
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-slate-900">${asset.purchasePrice?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      {roomAssets.length === 0 && (
+                        <tr>
+                          <td colSpan="6" className="py-8 text-center text-slate-400 italic">No assets assigned or stored in this room.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

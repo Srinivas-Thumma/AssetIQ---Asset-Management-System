@@ -2,6 +2,10 @@ import { Organization } from '../models/Organization.js';
 import { User } from '../models/User.js';
 import { Asset } from '../models/Asset.js';
 import { Plan } from '../models/Plan.js';
+import { Branch } from '../models/Branch.js';
+import { Building } from '../models/Building.js';
+import { Floor } from '../models/Floor.js';
+import { Room } from '../models/Room.js';
 import { AiAuditLog } from '../models/AiAuditLog.js';
 import { sendResponse } from '../utils/apiResponse.js';
 import { runWithTenant } from '../utils/tenantContext.js';
@@ -81,6 +85,65 @@ export const updateOrganization = async (req, res, next) => {
 
     const updatedOrg = await Organization.findById(org._id).populate('planId');
     return sendResponse(res, 200, true, 'Organization updated successfully', updatedOrg);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteOrganization = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const org = await Organization.findById(id);
+    if (!org) {
+      return sendResponse(res, 404, false, 'Organization not found');
+    }
+
+    // Delete organization document and purge its associated users and assets
+    await Promise.all([
+      Organization.findByIdAndDelete(id),
+      User.deleteMany({ organizationId: id }),
+      Asset.deleteMany({ organizationId: id }),
+      Branch.deleteMany({ organizationId: id }),
+      Building.deleteMany({ organizationId: id }),
+      Floor.deleteMany({ organizationId: id }),
+      Room.deleteMany({ organizationId: id }),
+    ]);
+
+    return sendResponse(res, 200, true, 'Organization and its storage data purged successfully', null);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const inspectOrganization = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const org = await Organization.findById(id).populate('planId');
+    if (!org) {
+      return sendResponse(res, 404, false, 'Organization not found');
+    }
+
+    const [branches, buildings, floors, rooms, assets, users] = await Promise.all([
+      Branch.find({ organizationId: id }),
+      Building.find({ organizationId: id }),
+      Floor.find({ organizationId: id }),
+      Room.find({ organizationId: id }),
+      Asset.find({ organizationId: id })
+        .populate('categoryId')
+        .populate('roomId')
+        .populate('assignedTo'),
+      User.find({ organizationId: id }).select('email role createdAt')
+    ]);
+
+    return sendResponse(res, 200, true, 'Organization details retrieved successfully', {
+      organization: org,
+      branches,
+      buildings,
+      floors,
+      rooms,
+      assets,
+      users
+    });
   } catch (error) {
     next(error);
   }
@@ -190,30 +253,49 @@ export const deletePlan = async (req, res, next) => {
 
 export const getStorageUsage = async (req, res, next) => {
   try {
-    // $bsonSize calculates the byte size of each document in Asset (dominating factor is base64 inline QR strings)
-    const usageByOrg = await Asset.aggregate([
-      {
-        $group: {
-          _id: '$organizationId',
-          totalBytes: { $sum: { $bsonSize: '$$ROOT' } },
-          assetCount: { $sum: 1 },
-        },
-      },
-    ]);
+    const orgs = await Organization.find().lean();
+    const assets = await Asset.find()
+      .populate('categoryId', 'name')
+      .populate({
+        path: 'roomId',
+        select: 'name floorId',
+        populate: {
+          path: 'floorId',
+          select: 'name buildingId',
+          populate: { path: 'buildingId', select: 'name' }
+        }
+      })
+      .lean();
 
-    const orgs = await Organization.find().select('name _id');
-    const result = usageByOrg.map((u) => {
-      const org = orgs.find((o) => o._id.toString() === (u._id ? u._id.toString() : ''));
+    const result = orgs.map((org) => {
+      const orgAssets = assets.filter((a) => a.organizationId && a.organizationId.toString() === org._id.toString());
       return {
-        organizationId: u._id,
-        organizationName: org ? org.name : 'System / Unscoped',
-        assetCount: u.assetCount,
-        storageBytes: u.totalBytes,
-        storageMB: (u.totalBytes / (1024 * 1024)).toFixed(4),
+        organizationId: org._id,
+        organizationName: org.name,
+        slug: org.slug,
+        status: org.status,
+        assetCount: orgAssets.length,
+        assets: orgAssets.map((a) => {
+          const room = a.roomId;
+          const floor = room?.floorId;
+          const building = floor?.buildingId;
+          const locationStr = room 
+            ? `${room.name}${floor ? ' - ' + floor.name : ''}${building ? ' (' + building.name + ')' : ''}`
+            : 'Unassigned Room';
+          return {
+            _id: a._id,
+            assetCode: a.assetCode,
+            name: a.name,
+            categoryName: a.categoryId?.name || 'Uncategorized',
+            roomLocation: locationStr,
+            status: a.status,
+            purchasePrice: a.purchasePrice || 0,
+          };
+        }),
       };
     });
 
-    return sendResponse(res, 200, true, 'Storage usage statistics retrieved successfully', result);
+    return sendResponse(res, 200, true, 'Organization storage details retrieved successfully', result);
   } catch (error) {
     next(error);
   }

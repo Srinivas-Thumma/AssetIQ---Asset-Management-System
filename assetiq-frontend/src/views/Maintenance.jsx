@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Calendar, AlertCircle, Plus, CheckCircle, Wrench, ShieldAlert, X, Edit, Trash2, MessageSquare } from 'lucide-react';
 import MaintenanceChatDrawer from '../components/MaintenanceChatDrawer';
+import CustomSelect from '../components/ui/CustomSelect';
 
-export default function Maintenance() {
+export default function Maintenance({ notifications = [], onRefreshNotifications }) {
   const { apiCall, user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [assets, setAssets] = useState([]);
@@ -18,6 +19,16 @@ export default function Maintenance() {
   const [editRequestData, setEditRequestData] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [activeChatRequest, setActiveChatRequest] = useState(null);
+
+  const handleOpenChat = async (req) => {
+    setActiveChatRequest(req);
+    try {
+      await apiCall(`/api/v1/notifications/chat/${req._id}`, { method: 'PUT' });
+      if (onRefreshNotifications) onRefreshNotifications();
+    } catch (err) {
+      console.error('Failed to mark chat notification as read:', err);
+    }
+  };
 
   // New Request Form state
   const [newRequest, setNewRequest] = useState({
@@ -249,11 +260,18 @@ export default function Maintenance() {
                   if (req.priority === 'critical') priorityColor = 'bg-red-50 text-red-700 border-red-100';
                   if (req.priority === 'low') priorityColor = 'bg-slate-50 text-slate-500 border-slate-100';
 
-                  let statusColor = 'bg-slate-100 text-slate-700 border-slate-200';
-                  if (req.status === 'open') statusColor = 'bg-slate-100 text-slate-700 border-slate-200';
-                  if (req.status === 'assigned') statusColor = 'bg-indigo-50 text-indigo-700 border-indigo-100';
-                  if (req.status === 'in_progress') statusColor = 'bg-amber-50 text-amber-700 border-amber-100';
-                  if (req.status === 'resolved') statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                  let statusColor = 'bg-blue-50 text-blue-700 border-blue-100';
+                  let statusLabel = 'Open';
+                  if (req.status === 'open') {
+                    statusColor = 'bg-blue-50 text-blue-700 border-blue-100';
+                    statusLabel = 'Open';
+                  } else if (req.status === 'in_progress' || req.status === 'assigned') {
+                    statusColor = 'bg-amber-50 text-amber-700 border-amber-100';
+                    statusLabel = 'In Repair';
+                  } else if (req.status === 'resolved') {
+                    statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                    statusLabel = 'Resolved';
+                  }
 
                   return (
                     <tr key={req._id} className="hover:bg-slate-50/50 transition-colors">
@@ -282,19 +300,29 @@ export default function Maintenance() {
                         {new Date(req.scheduledDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusColor} capitalize`}>
-                          {req.status.replace('_', ' ')}
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusColor}`}>
+                          {statusLabel}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setActiveChatRequest(req)}
-                            title="Open Ticket Chat"
-                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg cursor-pointer transition-colors"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </button>
+                          {(() => {
+                            const hasUnreadChat = notifications.some(
+                              (n) => !n.read && n.type === 'chat_message' && (String(n.relatedId) === String(req._id) || String(n.relatedId?._id) === String(req._id))
+                            );
+                            return (
+                              <button
+                                onClick={() => handleOpenChat(req)}
+                                title="Open Ticket Chat"
+                                className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg cursor-pointer transition-colors relative"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                                {hasUnreadChat && (
+                                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-rose-600 animate-pulse border border-white" />
+                                )}
+                              </button>
+                            );
+                          })()}
 
                           {user?.role !== 'employee' && (
                             <>
@@ -317,33 +345,24 @@ export default function Maintenance() {
 
                           {user?.role !== 'employee' && req.status === 'open' && (
                             <button
-                              onClick={() => handleUpdateStatus(req._id, 'assigned')}
-                              className="text-xs bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 font-bold py-1 px-2.5 rounded-lg cursor-pointer transition-colors"
-                            >
-                              Assign Staff
-                            </button>
-                          )}
-
-                          {user?.role !== 'employee' && req.status === 'assigned' && (
-                            <button
                               onClick={() => handleUpdateStatus(req._id, 'in_progress')}
-                              className="text-xs bg-amber-50 border border-amber-100 hover:bg-amber-100 text-amber-700 font-bold py-1 px-2.5 rounded-lg cursor-pointer transition-colors"
+                              className="text-xs bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-700 font-bold py-1 px-3 rounded-lg cursor-pointer transition-colors"
                             >
-                              Start Repair
+                              Repair
                             </button>
                           )}
 
-                          {user?.role !== 'employee' && ['assigned', 'in_progress', 'open'].includes(req.status) && (
+                          {user?.role !== 'employee' && (req.status === 'in_progress' || req.status === 'assigned') && (
                             <button
                               onClick={() => handleOpenResolve(req)}
-                              className="text-xs bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 text-emerald-700 font-bold py-1 px-2.5 rounded-lg cursor-pointer transition-colors"
+                              className="text-xs bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 font-bold py-1 px-3 rounded-lg cursor-pointer transition-colors"
                             >
                               Resolve
                             </button>
                           )}
                           
                           {req.status === 'resolved' && (
-                            <span className="text-xs text-slate-400 italic font-semibold">Completed</span>
+                            <span className="text-xs text-emerald-600 font-semibold italic">Completed</span>
                           )}
                         </div>
                       </td>
@@ -378,43 +397,60 @@ export default function Maintenance() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Select Target Asset</label>
-                <select
-                  required
-                  value={newRequest.assetId}
-                  onChange={(e) => setNewRequest({ ...newRequest, assetId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                >
-                  <option value="">Select Asset...</option>
-                  {assets.map((a) => (
-                    <option key={a._id} value={a._id}>{a.name} ({a.assetCode}) - Status: {a.status}</option>
-                  ))}
-                </select>
+                {(() => {
+                  const availableAssets = assets.filter((a) => {
+                    const hasActiveTicket = requests.some(
+                      (r) => (r.assetId?._id || r.assetId || '').toString() === a._id.toString() && r.status !== 'resolved'
+                    );
+                    return !hasActiveTicket;
+                  });
+
+                  return (
+                    <>
+                      <CustomSelect
+                        placeholder="Select Asset..."
+                        value={newRequest.assetId}
+                        onChange={(e) => setNewRequest({ ...newRequest, assetId: e.target ? e.target.value : e })}
+                        options={availableAssets.map((a) => ({
+                          value: a._id,
+                          label: `${a.name} (${a.assetCode})`,
+                          description: `Status: ${a.status?.replace('_', ' ')}`,
+                        }))}
+                      />
+                      {availableAssets.length === 0 && (
+                        <span className="text-[11px] text-amber-600 block mt-1 font-medium">
+                          All registered assets are currently under active maintenance or retired.
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Request Type</label>
-                  <select
+                  <CustomSelect
                     value={newRequest.type}
                     onChange={(e) => setNewRequest({ ...newRequest, type: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                  >
-                    <option value="corrective">Corrective (Breakdown)</option>
-                    <option value="preventive">Preventive (Routine)</option>
-                  </select>
+                    options={[
+                      { value: 'corrective', label: 'Corrective (Breakdown)' },
+                      { value: 'preventive', label: 'Preventive (Routine)' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Priority</label>
-                  <select
+                  <CustomSelect
                     value={newRequest.priority}
                     onChange={(e) => setNewRequest({ ...newRequest, priority: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
+                    options={[
+                      { value: 'low', label: 'Low' },
+                      { value: 'medium', label: 'Medium' },
+                      { value: 'high', label: 'High' },
+                      { value: 'critical', label: 'Critical' },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -566,29 +602,28 @@ export default function Maintenance() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Priority</label>
-                  <select
+                  <CustomSelect
                     value={editRequestData.priority}
                     onChange={(e) => setEditRequestData({ ...editRequestData, priority: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none capitalize"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
+                    options={[
+                      { value: 'low', label: 'Low' },
+                      { value: 'medium', label: 'Medium' },
+                      { value: 'high', label: 'High' },
+                      { value: 'critical', label: 'Critical' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status</label>
-                  <select
+                  <CustomSelect
                     value={editRequestData.status}
                     onChange={(e) => setEditRequestData({ ...editRequestData, status: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-700 text-sm focus:outline-none capitalize"
-                  >
-                    <option value="open">Open</option>
-                    <option value="assigned">Assigned</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
+                    options={[
+                      { value: 'open', label: 'Open' },
+                      { value: 'in_progress', label: 'In Repair' },
+                      { value: 'resolved', label: 'Resolved' },
+                    ]}
+                  />
                 </div>
               </div>
 

@@ -49,7 +49,7 @@ export const getAssets = async (req, res, next) => {
       })
       .populate('assignedTo')
       .populate('vendorId')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 }); // newest first
 
     return sendResponse(res, 200, true, 'Assets retrieved successfully', assets);
   } catch (error) {
@@ -100,15 +100,14 @@ export const createAsset = async (req, res, next) => {
       return sendResponse(res, 400, false, 'All fields are required');
     }
 
-    // 1. Plan Limit Enforcement
-    // Load the organization and check its plan asset limit
- console.log("req.orgId:", req.orgId);
+    // Check role/organization context
+    if (req.user?.role === 'super_admin' || !req.orgId) {
+      return sendResponse(res, 403, false, 'Only Organization Admins and Asset Managers can add assets. Super Admins manage platform organization controls.');
+    }
 
-const org = await Organization.findById(req.orgId).populate("planId");
-
-console.log("Organization:", org);
+    const org = await Organization.findById(req.orgId).populate("planId");
     if (!org) {
-      return sendResponse(res, 400, false, 'Organization context not found');
+      return sendResponse(res, 400, false, 'Only Organization Admins and Asset Managers can add assets. Super Admins manage platform organization controls.');
     }
 
     const planLimit = org.planId ? org.planId.maxAssets : 100;
@@ -201,16 +200,21 @@ export const updateAsset = async (req, res, next) => {
 
 export const deleteAsset = async (req, res, next) => {
   try {
+    const { mode } = req.query;
     const asset = await Asset.findById(req.params.id);
     if (!asset) {
       return sendResponse(res, 404, false, 'Asset not found');
     }
 
-    // Mark as retired instead of hard deletion to preserve history logs
-    asset.status = 'retired';
-    await asset.save();
+    if (mode === 'retire') {
+      asset.status = 'retired';
+      await asset.save();
+      return sendResponse(res, 200, true, 'Asset status updated to retired', asset);
+    }
 
-    return sendResponse(res, 200, true, 'Asset retired successfully', asset);
+    // Permanent hard deletion
+    await asset.deleteOne();
+    return sendResponse(res, 200, true, 'Asset deleted successfully');
   } catch (error) {
     next(error);
   }

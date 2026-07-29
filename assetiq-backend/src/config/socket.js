@@ -4,6 +4,8 @@ import { verifyTokenAndGetUser } from '../middlewares/auth.middleware.js';
 import { MaintenanceRequest } from '../models/MaintenanceRequest.js';
 import { MaintenanceMessage } from '../models/MaintenanceMessage.js';
 import { Asset } from '../models/Asset.js';
+import { Notification } from '../models/Notification.js';
+import { User } from '../models/User.js';
 
 let io = null;
 
@@ -146,6 +148,53 @@ export const initSocket = (server) => {
         const roomName = `chat:request:${requestId}`;
         io.to(roomName).emit('chat:message', newMessage);
         console.log(`💬 Chat message broadcasted to [${roomName}] by ${socket.user.email}`);
+
+        // Generate and broadcast live Notification to the recipient(s)
+        try {
+          const senderEmailPrefix = socket.user.email.split('@')[0];
+          const notifText = `💬 New ticket message from ${senderEmailPrefix}: "${message.trim().slice(0, 45)}${message.trim().length > 45 ? '...' : ''}"`;
+
+          // Collect all potential recipient users for this organization (Org Admins & Asset Managers)
+          const orgStaff = await User.find({
+            organizationId: request.organizationId,
+            role: { $in: ['org_admin', 'asset_manager'] }
+          });
+
+          const recipientMap = new Map();
+          orgStaff.forEach((u) => {
+            if (u._id.toString() !== socket.user._id.toString()) {
+              recipientMap.set(u._id.toString(), u);
+            }
+          });
+
+          // Also include ticket creator employee if not the message sender
+          if (request.raisedBy && request.raisedBy.toString() !== socket.user._id.toString()) {
+            const raisedUser = await User.findById(request.raisedBy);
+            if (raisedUser) {
+              recipientMap.set(raisedUser._id.toString(), raisedUser);
+            }
+          }
+
+          const recipients = Array.from(recipientMap.values());
+
+          for (const recipient of recipients) {
+            if (recipient._id.toString() !== socket.user._id.toString()) {
+              const notifDoc = await Notification.create({
+                organizationId: request.organizationId,
+                userId: recipient._id,
+                message: notifText,
+                type: 'chat_message',
+                relatedId: requestId,
+                read: false,
+              });
+
+              io.to(`user:${recipient._id.toString()}`).emit('notification:new', notifDoc);
+              console.log(`🔔 Live Chat Notification sent to User [${recipient.email}]`);
+            }
+          }
+        } catch (notifErr) {
+          console.error('⚠️ Notification generation issue:', notifErr.message);
+        }
       } catch (err) {
         console.error('❌ Chat Message Error:', err.message);
         socket.emit('chat:error', { requestId, message: 'Failed to send chat message' });

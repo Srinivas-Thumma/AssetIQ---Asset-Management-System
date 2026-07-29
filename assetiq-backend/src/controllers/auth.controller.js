@@ -108,54 +108,12 @@ export const register = async (req, res, next) => {
         throw new Error('Email is already registered in this organization');
       }
 
-      // Create Admin User
+      // Create Admin User (Clean slate initialization: no mock branches, buildings, or employees)
       const newAdmin = await User.create({
         email: validated.email,
         passwordHash: validated.password,
         role: 'org_admin',
         organizationId: orgIdString,
-      });
-
-      // Seed Default Tenant Data (Branch, Building, Floor, Room, Department, Category)
-      const defaultBranch = await Branch.create({ name: 'Headquarters', code: 'HQ' });
-      const defaultBuilding = await Building.create({ branchId: defaultBranch._id, name: 'Main Office', code: 'MO' });
-      const defaultFloor = await Floor.create({ buildingId: defaultBuilding._id, name: 'Ground Floor', number: 0 });
-      const defaultRoom = await Room.create({ floorId: defaultFloor._id, name: 'IT Lab Room', code: 'IT-LAB' });
-
-      const defaultDept = await Department.create({ name: 'Information Technology', code: 'IT' });
-      await Category.create({ name: 'Laptops & Computers', code: 'IT-COMP' });
-      await Category.create({ name: 'HVAC Systems', code: 'HVAC' });
-
-      // Seed an Employee profile for testing
-      const managerEmp = await Employee.create({
-        name: 'Jane Manager',
-        employeeId: 'EMP-MGR-01',
-        email: `manager@${validated.orgSlug}.com`,
-        departmentId: defaultDept._id
-      });
-
-      const regularEmp = await Employee.create({
-        name: 'John Staff',
-        employeeId: 'EMP-STF-02',
-        email: `employee@${validated.orgSlug}.com`,
-        departmentId: defaultDept._id
-      });
-
-      // Create login users for manager and employee
-      await User.create({
-        email: `manager@${validated.orgSlug}.com`,
-        passwordHash: 'password123',
-        role: 'asset_manager',
-        employeeRef: managerEmp._id,
-        organizationId: orgIdString
-      });
-
-      await User.create({
-        email: `employee@${validated.orgSlug}.com`,
-        passwordHash: 'password123',
-        role: 'employee',
-        employeeRef: regularEmp._id,
-        organizationId: orgIdString
       });
 
       return { user: newAdmin };

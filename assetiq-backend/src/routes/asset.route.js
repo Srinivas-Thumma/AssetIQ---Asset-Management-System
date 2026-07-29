@@ -27,7 +27,7 @@ router.route('/')
 router.route('/:id')
   .get(getAssetById)
   .put(requireRole('org_admin', 'super_admin', 'asset_manager'), updateAsset)
-  .delete(requireRole('org_admin', 'super_admin'), deleteAsset);
+  .delete(requireRole('org_admin', 'super_admin', 'asset_manager'), deleteAsset);
 
 // Assign & Return
 router.post('/:id/assign', requireRole('org_admin', 'super_admin', 'asset_manager'), assignAsset);

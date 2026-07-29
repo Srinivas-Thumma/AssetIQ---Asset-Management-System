@@ -13,7 +13,7 @@ export const getMaintenanceRequests = async (req, res, next) => {
         populate: { path: 'categoryId' }
       })
       .populate('raisedBy', 'email role')
-      .sort({ scheduledDate: 1 });
+      .sort({ createdAt: -1 });
 
     return sendResponse(res, 200, true, 'Maintenance requests retrieved', list);
   } catch (error) {
@@ -31,6 +31,21 @@ export const createMaintenanceRequest = async (req, res, next) => {
     const asset = await Asset.findById(assetId);
     if (!asset) {
       return sendResponse(res, 404, false, 'Asset not found');
+    }
+
+    // Check if asset already has an active maintenance ticket
+    const existingActiveTicket = await MaintenanceRequest.findOne({
+      assetId,
+      status: { $in: ['open', 'in_progress', 'assigned'] }
+    });
+
+    if (existingActiveTicket) {
+      return sendResponse(
+        res,
+        400,
+        false,
+        'This asset already has an active maintenance ticket. Please resolve or delete the existing ticket before scheduling a new servicing request.'
+      );
     }
 
     // Set asset status to under_maintenance

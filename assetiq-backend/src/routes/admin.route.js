@@ -5,6 +5,8 @@ import {
   getOrganizations,
   createOrganization,
   updateOrganization,
+  deleteOrganization,
+  inspectOrganization,
   getPlatformAnalytics,
   getPlans,
   createPlan,
@@ -23,7 +25,11 @@ router.route('/organizations')
   .get(getOrganizations)
   .post(createOrganization);
 
-router.put('/organizations/:id', updateOrganization);
+router.route('/organizations/:id')
+  .put(updateOrganization)
+  .delete(deleteOrganization);
+
+router.get('/organizations/:id/inspect', inspectOrganization);
 router.get('/analytics', getPlatformAnalytics);
 router.get('/storage-usage', getStorageUsage);
 

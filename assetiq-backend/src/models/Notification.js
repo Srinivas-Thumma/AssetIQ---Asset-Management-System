@@ -21,7 +21,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['warranty_expiring', 'maintenance_due'],
+      enum: ['warranty_expiring', 'maintenance_due', 'chat_message'],
       required: true
     },
     read: {

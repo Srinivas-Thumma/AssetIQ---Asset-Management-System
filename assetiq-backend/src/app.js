@@ -29,7 +29,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json()); // Parse JSON bodies
 app.use(morgan('dev'));
 
 // GET /health Endpoint (Observability & diagnostics check)
