@@ -4,6 +4,7 @@ import { requireRole } from '../middlewares/rbac.middleware.js';
 import {
   getOrganizations,
   createOrganization,
+  createOrgAdmin,
   updateOrganization,
   deleteOrganization,
   inspectOrganization,
@@ -12,7 +13,8 @@ import {
   createPlan,
   updatePlan,
   deletePlan,
-  getStorageUsage
+  getStorageUsage,
+  getAllGlobalTickets
 } from '../controllers/admin.controller.js';
 
 const router = express.Router();
@@ -20,6 +22,9 @@ const router = express.Router();
 // Apply auth globally to this router (Admin operations bypass tenantScope middleware to execute unscoped queries)
 router.use(protect);
 router.use(requireRole('super_admin'));
+
+router.get('/tickets', getAllGlobalTickets);
+router.post('/org-admin', createOrgAdmin);
 
 router.route('/organizations')
   .get(getOrganizations)

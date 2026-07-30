@@ -379,8 +379,8 @@ export default function Maintenance({ notifications = [], onRefreshNotifications
 
       {/* Schedule Maintenance Modal */}
       {showScheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm cursor-pointer" onClick={() => setShowScheduleModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800">Schedule Asset Servicing</h3>
               <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -500,8 +500,8 @@ export default function Maintenance({ notifications = [], onRefreshNotifications
 
       {/* Resolve Maintenance Modal */}
       {showResolveModal && selectedRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm cursor-pointer" onClick={() => setShowResolveModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800">Complete Repair & Log Invoice</h3>
               <button onClick={() => setShowResolveModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -580,8 +580,8 @@ export default function Maintenance({ notifications = [], onRefreshNotifications
 
       {/* Edit Maintenance Ticket Modal */}
       {showEditModal && editRequestData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm cursor-pointer" onClick={() => setShowEditModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-slate-800">Edit Maintenance Ticket</h3>

@@ -3,18 +3,22 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Globe, Users, ShieldAlert, Award, Power, RefreshCw, 
   Plus, X, Brain, Database, CreditCard, Edit2, Trash2,
-  Eye, MapPin, Package, Layers, Building2, CheckCircle2,
-  ChevronRight, ChevronDown
+  Eye, EyeOff, MapPin, Package, Layers, Building2, CheckCircle2,
+  ChevronRight, ChevronDown, Wrench, Search, UserPlus
 } from 'lucide-react';
 import CustomSelect from '../components/ui/CustomSelect';
 
 export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
   const { apiCall } = useAuth();
-  const [activeSubTab, setActiveSubTab] = useState(initialSubTab || 'organizations'); // 'organizations' | 'plans' | 'storage'
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab || 'organizations'); // 'organizations' | 'plans' | 'storage' | 'tickets'
   const [analytics, setAnalytics] = useState(null);
   const [organizations, setOrganizations] = useState([]);
   const [plans, setPlans] = useState([]);
   const [storageData, setStorageData] = useState([]);
+  const [globalTickets, setGlobalTickets] = useState([]);
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState('all');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
   const [expandedOrgs, setExpandedOrgs] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,8 +55,10 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
     }
   };
 
-  // Manual Org Modal
+  // Manual Org & Admin Provisioning Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [provisionModalTab, setProvisionModalTab] = useState('create_org'); // 'create_org' | 'add_admin'
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [orgForm, setOrgForm] = useState({
     name: '',
     slug: '',
@@ -60,8 +66,14 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
     adminEmail: '',
     adminPassword: ''
   });
+  const [adminForm, setAdminForm] = useState({
+    organizationId: '',
+    email: '',
+    password: ''
+  });
   const [orgFormError, setOrgFormError] = useState('');
   const [orgSubmitting, setOrgSubmitting] = useState(false);
+  const [adminSubmitting, setAdminSubmitting] = useState(false);
 
   // Plan Modal
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -78,11 +90,12 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
   const fetchPlatformData = async () => {
     setRefreshing(true);
     try {
-      const [analyticsRes, orgsRes, plansRes, storageRes] = await Promise.all([
+      const [analyticsRes, orgsRes, plansRes, storageRes, ticketsRes] = await Promise.all([
         apiCall('/api/v1/admin/analytics'),
         apiCall('/api/v1/admin/organizations'),
         apiCall('/api/v1/admin/plans'),
-        apiCall('/api/v1/admin/storage-usage')
+        apiCall('/api/v1/admin/storage-usage'),
+        apiCall('/api/v1/admin/tickets')
       ]);
 
       if (analyticsRes.success) setAnalytics(analyticsRes.data);
@@ -94,6 +107,7 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
         }
       }
       if (storageRes.success) setStorageData(storageRes.data);
+      if (ticketsRes.success) setGlobalTickets(ticketsRes.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -205,6 +219,34 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
     }
   };
 
+  const handleAddOrgAdmin = async (e) => {
+    e.preventDefault();
+    if (!adminForm.organizationId || !adminForm.email || !adminForm.password) {
+      setOrgFormError('Please select an organization and enter admin credentials');
+      return;
+    }
+    setAdminSubmitting(true);
+    setOrgFormError('');
+    try {
+      const res = await apiCall('/api/v1/admin/org-admin', {
+        method: 'POST',
+        body: JSON.stringify(adminForm)
+      });
+      if (res.success) {
+        setShowCreateModal(false);
+        setAdminForm({ organizationId: '', email: '', password: '' });
+        fetchPlatformData();
+      } else {
+        setOrgFormError(res.message || 'Failed to create Organization Admin');
+      }
+    } catch (err) {
+      console.error(err);
+      setOrgFormError('Network connection issue');
+    } finally {
+      setAdminSubmitting(false);
+    }
+  };
+
   const handleOpenPlanEdit = (plan) => {
     setEditPlanId(plan._id);
     setPlanForm({
@@ -287,7 +329,12 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Platform Control Center</h1>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+            {activeSubTab === 'organizations' ? 'Global Organizations' :
+             activeSubTab === 'plans' ? 'Subscription Plans' :
+             activeSubTab === 'storage' ? 'Organization Storage Footprint' :
+             activeSubTab === 'tickets' ? 'Global Maintenance Tickets' : 'Platform Control Center'}
+          </h1>
           <p className="text-slate-500 mt-1">Cross-tenant monitoring, SaaS subscription plans, and data usage metrics.</p>
         </div>
         <div className="flex gap-3">
@@ -322,45 +369,6 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs */}
-      <div className="flex border-b border-slate-250 gap-6">
-        <button
-          onClick={() => setActiveSubTab('organizations')}
-          className={`flex items-center gap-2 pb-4 text-sm font-bold border-b-2 transition-all cursor-pointer ${
-            activeSubTab === 'organizations' 
-              ? 'border-blue-600 text-blue-600' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
-          }`}
-        >
-          <Globe className="h-4.5 w-4.5" />
-          Global Organizations
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('plans')}
-          className={`flex items-center gap-2 pb-4 text-sm font-bold border-b-2 transition-all cursor-pointer ${
-            activeSubTab === 'plans' 
-              ? 'border-blue-600 text-blue-600' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
-          }`}
-        >
-          <CreditCard className="h-4.5 w-4.5" />
-          Subscription Plans
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('storage')}
-          className={`flex items-center gap-2 pb-4 text-sm font-bold border-b-2 transition-all cursor-pointer ${
-            activeSubTab === 'storage' 
-              ? 'border-blue-600 text-blue-600' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
-          }`}
-        >
-          <Database className="h-4.5 w-4.5" />
-          Organization Storage Footprint
-        </button>
-      </div>
-
       {/* --- TAB 1: ORGANIZATIONS & PLATFORM ANALYTICS --- */}
       {activeSubTab === 'organizations' && (
         <div className="space-y-6 animate-fade-in">
@@ -368,7 +376,7 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex items-center justify-between">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total SaaS Tenants</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Organizations</span>
                 <span className="text-4xl font-extrabold text-slate-800 mt-2 block">{analytics?.totalOrganizations || 0}</span>
               </div>
               <div className="p-4 bg-blue-50 rounded-xl text-blue-600">
@@ -722,122 +730,415 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
         </div>
       )}
 
+      {/* --- TAB 4: GLOBAL MAINTENANCE TICKETS --- */}
+      {activeSubTab === 'tickets' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Filter Bar */}
+          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search tickets by description, asset code, asset name, or organization..."
+                value={ticketSearch}
+                onChange={(e) => setTicketSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="w-48">
+                <CustomSelect
+                  options={[
+                    { value: 'all', label: 'All Organizations' },
+                    ...organizations.map(o => ({ value: o._id, label: o.name }))
+                  ]}
+                  value={selectedOrgFilter}
+                  onChange={setSelectedOrgFilter}
+                />
+              </div>
+
+              <div className="w-40">
+                <CustomSelect
+                  options={[
+                    { value: 'all', label: 'All Statuses' },
+                    { value: 'open', label: 'Open' },
+                    { value: 'assigned', label: 'Assigned' },
+                    { value: 'in_progress', label: 'In Progress' },
+                    { value: 'resolved', label: 'Resolved' }
+                  ]}
+                  value={selectedStatusFilter}
+                  onChange={setSelectedStatusFilter}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Tickets Table */}
+          <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                    <th className="py-4 px-6">Asset Details</th>
+                    <th className="py-4 px-6">Issue & Priority</th>
+                    <th className="py-4 px-6">Organization</th>
+                    <th className="py-4 px-6">Scheduled Date</th>
+                    <th className="py-4 px-6">Current Progress</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
+                  {globalTickets
+                    .filter(t => {
+                      const matchesOrg = selectedOrgFilter === 'all' || 
+                        t.organizationId?._id === selectedOrgFilter || 
+                        t.assetId?.organizationId?._id === selectedOrgFilter;
+                      
+                      const matchesStatus = selectedStatusFilter === 'all' || t.status === selectedStatusFilter;
+
+                      const q = ticketSearch.toLowerCase();
+                      const matchesSearch = !q || 
+                        t.description?.toLowerCase().includes(q) ||
+                        t.assetId?.name?.toLowerCase().includes(q) ||
+                        t.assetId?.assetCode?.toLowerCase().includes(q) ||
+                        t.organizationId?.name?.toLowerCase().includes(q);
+
+                      return matchesOrg && matchesStatus && matchesSearch;
+                    })
+                    .map((ticket, index) => {
+                      const orgObj = ticket.organizationId || ticket.assetId?.organizationId;
+                      const orgIdRaw = typeof ticket.organizationId === 'string'
+                        ? ticket.organizationId
+                        : (ticket.organizationId?._id || ticket.assetId?.organizationId?._id);
+
+                      const matchedOrg = organizations.find(o => o._id === orgIdRaw?.toString());
+                      
+                      const orgName = orgObj?.name || matchedOrg?.name || orgObj?.slug || matchedOrg?.slug || `org-${index + 1}`;
+
+                      // Calculate progress percentage and badge styling
+                      let percent = 25;
+                      let progressLabel = 'Open Request';
+                      let barColor = 'bg-amber-500';
+                      let badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+
+                      if (ticket.status === 'assigned') {
+                        percent = 50;
+                        progressLabel = 'Staff Assigned';
+                        barColor = 'bg-blue-500';
+                        badgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
+                      } else if (ticket.status === 'in_progress') {
+                        percent = 75;
+                        progressLabel = 'Servicing In Progress';
+                        barColor = 'bg-indigo-500';
+                        badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                      } else if (ticket.status === 'resolved') {
+                        percent = 100;
+                        progressLabel = 'Resolved & Closed';
+                        barColor = 'bg-emerald-500';
+                        badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                      }
+
+                      return (
+                        <tr key={ticket._id} className="hover:bg-slate-50/60 transition-colors">
+                          {/* Asset Details */}
+                          <td className="py-4 px-6">
+                            <div>
+                              <span className="font-bold text-slate-800 block">{ticket.assetId?.name || 'Unlinked Asset'}</span>
+                              {ticket.assetId?.assetCode && (
+                                <span className="text-xs font-mono font-semibold text-slate-400">{ticket.assetId.assetCode}</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Issue & Priority */}
+                          <td className="py-4 px-6 max-w-xs">
+                            <p className="text-xs font-medium text-slate-700 line-clamp-2">{ticket.description}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                                ticket.priority === 'urgent' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                ticket.priority === 'high' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>
+                                {ticket.priority || 'medium'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 capitalize">{ticket.type}</span>
+                            </div>
+                          </td>
+
+                          {/* Organization */}
+                          <td className="py-4 px-6 font-bold text-slate-800 text-xs">
+                            {orgName}
+                          </td>
+
+                          {/* Scheduled Date */}
+                          <td className="py-4 px-6 text-xs font-medium text-slate-700">
+                            {ticket.scheduledDate ? new Date(ticket.scheduledDate).toLocaleDateString() : 'N/A'}
+                          </td>
+
+                          {/* Current Progress Indicator */}
+                          <td className="py-4 px-6">
+                            <div className="space-y-1.5 w-44">
+                              <div className="flex justify-between items-center text-[11px] font-bold">
+                                <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] border uppercase ${badgeClass}`}>
+                                  {progressLabel}
+                                </span>
+                                <span className="text-slate-500 font-mono text-[10px]">{percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full ${barColor} rounded-full transition-all duration-500`} 
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                  {globalTickets.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="py-12 text-center text-slate-400 italic">
+                        No maintenance requests recorded across any organization.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- MANUAL PROVISION MODAL --- */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in cursor-pointer" onClick={() => setShowCreateModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-800">Manually Provision Org Workspace</h3>
+              <h3 className="text-lg font-bold text-slate-800">
+                {provisionModalTab === 'create_org' ? 'Add New Organization' : 'Add Organization Admin'}
+              </h3>
               <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-650 cursor-pointer"><X className="h-5 w-5" /></button>
             </div>
+
+            {/* Segmented Tab Switcher */}
+            <div className="px-6 pt-4 bg-white border-b border-slate-100">
+              <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => { setProvisionModalTab('create_org'); setOrgFormError(''); }}
+                  className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    provisionModalTab === 'create_org'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                  Add Organization
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setProvisionModalTab('add_admin'); setOrgFormError(''); }}
+                  className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    provisionModalTab === 'add_admin'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Add Org Admin
+                </button>
+              </div>
+            </div>
             
-            <form onSubmit={handleCreateOrg} className="p-6 space-y-4">
-              {orgFormError && (
-                <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs">
-                  {orgFormError}
-                </div>
-              )}
+            {/* FORM 1: CREATE ORGANIZATION */}
+            {provisionModalTab === 'create_org' ? (
+              <form onSubmit={handleCreateOrg} className="p-6 space-y-4">
+                {orgFormError && (
+                  <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs">
+                    {orgFormError}
+                  </div>
+                )}
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Organization Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Initech Corp"
-                  value={orgForm.name}
-                  onChange={handleOrgNameChange}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Domain Slug</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. initech-corp"
-                  value={orgForm.slug}
-                  onChange={(e) => setOrgForm(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '') }))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-850 text-sm focus:outline-none focus:border-slate-400 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 font-sans">Service Plan Level</label>
-                <CustomSelect
-                  value={orgForm.planId}
-                  onChange={(e) => setOrgForm(prev => ({ ...prev, planId: e.target.value }))}
-                  options={plans.map((p) => ({
-                    value: p._id,
-                    label: `${p.name} ($${p.price}/mo)`,
-                    description: `Max ${p.maxAssets || 100} Assets limit`,
-                  }))}
-                />
-              </div>
-
-              <div className="border-t border-slate-100 pt-4 space-y-3">
-                <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block font-mono">Root Administrator Credentials</span>
-                
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Admin Email</label>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Organization Name</label>
                   <input
-                    type="email"
+                    type="text"
                     required
-                    placeholder="admin@initech.com"
-                    value={orgForm.adminEmail}
-                    onChange={(e) => setOrgForm(prev => ({ ...prev, adminEmail: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-850 text-sm focus:outline-none focus:border-slate-400"
+                    placeholder="e.g. Initech Corp"
+                    value={orgForm.name}
+                    onChange={handleOrgNameChange}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 text-sm focus:outline-none focus:border-slate-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Admin Password</label>
-                  <div className="relative">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Domain Slug</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. initech-corp"
+                    value={orgForm.slug}
+                    onChange={(e) => setOrgForm(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '') }))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-850 text-sm focus:outline-none focus:border-slate-400 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 font-sans">Service Plan Level</label>
+                  <CustomSelect
+                    value={orgForm.planId}
+                    onChange={(e) => setOrgForm(prev => ({ ...prev, planId: e.target.value }))}
+                    options={plans.map((p) => ({
+                      value: p._id,
+                      label: `${p.name} ($${p.price}/mo)`,
+                      description: `Max ${p.maxAssets || 100} Assets limit`,
+                    }))}
+                  />
+                </div>
+
+                <div className="border-t border-slate-100 pt-4 space-y-3">
+                  <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block font-mono">Root Administrator Credentials</span>
+                  
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Admin Email</label>
                     <input
-                      type={showAdminPassword ? "text" : "password"}
+                      type="email"
                       required
-                      placeholder="••••••••"
-                      value={orgForm.adminPassword}
-                      onChange={(e) => setOrgForm(prev => ({ ...prev, adminPassword: e.target.value }))}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 pr-10 text-slate-850 text-sm focus:outline-none focus:border-slate-400"
+                      placeholder="admin@initech.com"
+                      value={orgForm.adminEmail}
+                      onChange={(e) => setOrgForm(prev => ({ ...prev, adminEmail: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-850 text-sm focus:outline-none focus:border-slate-400"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowAdminPassword(!showAdminPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                      title={showAdminPassword ? "Hide password" : "Show password"}
-                    >
-                      {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Admin Password</label>
+                    <div className="relative">
+                      <input
+                        type={showAdminPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        value={orgForm.adminPassword}
+                        onChange={(e) => setOrgForm(prev => ({ ...prev, adminPassword: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 pr-10 text-slate-850 text-sm focus:outline-none focus:border-slate-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminPassword(!showAdminPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                        title={showAdminPassword ? "Hide password" : "Show password"}
+                      >
+                        {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={orgSubmitting}
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 animate-fade-in"
-                >
-                  {orgSubmitting ? 'Adding...' : 'Add Tenant'}
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={orgSubmitting}
+                    className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 animate-fade-in"
+                  >
+                    {orgSubmitting ? 'Adding...' : 'Add Tenant'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* FORM 2: ADD ORGANIZATION ADMIN TO EXISTING ORG */
+              <form onSubmit={handleAddOrgAdmin} className="p-6 space-y-4">
+                {orgFormError && (
+                  <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs">
+                    {orgFormError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 font-sans">Target Organization</label>
+                  <CustomSelect
+                    placeholder="Select Organization..."
+                    value={adminForm.organizationId}
+                    onChange={(e) => setAdminForm(prev => ({ ...prev, organizationId: e.target.value }))}
+                    options={organizations.map((o) => ({
+                      value: o._id,
+                      label: o.name,
+                      description: o.slug ? `slug: ${o.slug}` : undefined,
+                    }))}
+                  />
+                </div>
+
+                <div className="border-t border-slate-100 pt-3 space-y-3">
+                  <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block font-mono">Org Admin Credentials</span>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Admin Email</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="orgadmin@organization.com"
+                      value={adminForm.email}
+                      onChange={(e) => setAdminForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-850 text-sm focus:outline-none focus:border-slate-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Admin Password</label>
+                    <div className="relative">
+                      <input
+                        type={showAdminPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        value={adminForm.password}
+                        onChange={(e) => setAdminForm(prev => ({ ...prev, password: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 pr-10 text-slate-850 text-sm focus:outline-none focus:border-slate-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminPassword(!showAdminPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                        title={showAdminPassword ? "Hide password" : "Show password"}
+                      >
+                        {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={adminSubmitting}
+                    className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 animate-fade-in"
+                  >
+                    {adminSubmitting ? 'Creating Admin...' : 'Create Org Admin'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
 
       {/* --- PLAN CONFIGURATION MODAL --- */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in cursor-pointer" onClick={() => setShowPlanModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800">
                 {editPlanId ? 'Modify Subscription Plan' : 'Create Subscription Plan'}
@@ -924,8 +1225,8 @@ export default function SuperAdmin({ initialSubTab, autoOpenAddModal }) {
 
       {/* --- ORGANIZATION INSPECTION MODAL --- */}
       {showInspectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-slate-100 overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in cursor-pointer" onClick={() => setShowInspectModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-slate-100 overflow-hidden max-h-[90vh] flex flex-col cursor-default" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">

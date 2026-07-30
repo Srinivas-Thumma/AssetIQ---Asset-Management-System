@@ -100,18 +100,36 @@ export const predictNextMaintenance = (asset, maintenanceHistory, currentHealth)
   return predictedDate;
 };
 
+/**
+ * AI Asset Health Scoring & Predictive Analytics Engine:
+ * Analyzes asset age, maintenance ticket frequency, total repair cost, and warranty coverage to generate:
+ * - Health Score (0–100 index)
+ * - Predictive Maintenance Date (next recommended servicing)
+ * - Risk Assessment % & Actionable Insights
+ * 
+ * 4-Tier Execution & Fallback Decision Tree:
+ * Tier 1: Cache Check (Returns existing score if analyzed within 24h, unless `forceRecompute = true`).
+ * Tier 2: Mock Mode Branch (`MOCK_AI=true` -> Deterministic offline algorithm for testing without local GPU).
+ * Tier 3: Live Local LLM Query (Pings Ollama `/api/generate` with structured JSON prompt).
+ * Tier 4: Graceful Failover (If Ollama is offline or times out, falls back to deterministic mock calculation without throwing 500 errors).
+ */
 export const analyzeAssetHealth = async (asset, forceRecompute = false) => {
-  // 1. Cache-first check
-  if (
-    !forceRecompute &&
-    asset.ai &&
-    asset.ai.lastAnalyzedAt &&
-    (Date.now() - new Date(asset.ai.lastAnalyzedAt).getTime()) < 24 * 60 * 60 * 1000
-  ) {
-    return asset.ai;
+  if (!asset) return null;
+
+  // Tier 1: Cache Check (return stored score if fresh)
+  if (!forceRecompute && asset.ai && asset.ai.healthScore !== undefined) {
+    const hoursSinceLast = (Date.now() - new Date(asset.ai.lastAnalyzedAt).getTime()) / (1000 * 60 * 60);
+    if (hoursSinceLast < 24) {
+      return {
+        healthScore: asset.ai.healthScore,
+        insights: asset.ai.insights,
+        lastAnalyzedAt: asset.ai.lastAnalyzedAt,
+        predictedNextMaintenanceDate: asset.ai.predictedNextMaintenanceDate,
+        failureRiskPercent: asset.ai.failureRiskPercent,
+      };
+    }
   }
 
-  // 1.5. Log the active AI calculation for platform statistics tracking
   try {
     await AiAuditLog.create({
       organizationId: asset.organizationId || null,
@@ -123,14 +141,13 @@ export const analyzeAssetHealth = async (asset, forceRecompute = false) => {
   }
 
   try {
-    // 2. Fetch category, warranty, and maintenance history for analysis context
     const category = await Category.findById(asset.categoryId);
     const categoryName = category ? category.name : 'Unknown Category';
     
     const history = await MaintenanceHistory.find({ assetId: asset._id }).sort({ date: -1 });
     const warranty = await Warranty.findOne({ assetId: asset._id });
 
-    // 3. Check for Mock Mode
+    // Tier 2: Check for Mock Mode Environment Setting
     if (env.MOCK_AI) {
       console.log(`🤖 AI: MOCK_AI=true. Returning mock score for asset: ${asset.name} (${asset.assetCode})`);
       const mockScore = generateMockScore(asset, categoryName, history);
@@ -138,7 +155,7 @@ export const analyzeAssetHealth = async (asset, forceRecompute = false) => {
       return { ...mockScore, predictedNextMaintenanceDate };
     }
 
-    // 4. Ollama invocation
+    // Tier 3: Query Local Ollama LLM Model
     console.log(`🤖 AI: Querying local Ollama model at ${env.OLLAMA_URL} for ${asset.name}...`);
     
     const ageInYears = (Date.now() - new Date(asset.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25);

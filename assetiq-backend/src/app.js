@@ -17,7 +17,6 @@ import aiRouter from './routes/ai.route.js';
 import reportsRouter from './routes/reports.route.js';
 import adminRouter from './routes/admin.route.js';
 import notificationRouter from './routes/notification.route.js';
-import assetRequestRouter from './routes/assetRequest.route.js';
 import offboardingRouter from './routes/offboarding.route.js';
 import platformBannerRouter from './routes/platformBanner.route.js';
 
@@ -25,7 +24,7 @@ const app = express();
 
 // Middlewares
 app.use(cors({
-  origin: 'http://localhost:5173', // Credentials cookie requires exact origin
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true
 }));
 app.use(cookieParser());
@@ -76,7 +75,6 @@ app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/notifications', notificationRouter);
-app.use('/api/v1/asset-requests', assetRequestRouter);
 app.use('/api/v1/offboarding', offboardingRouter);
 app.use('/api/v1/platform', platformBannerRouter);
 

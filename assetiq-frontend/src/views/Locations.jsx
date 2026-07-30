@@ -429,8 +429,8 @@ export default function Locations() {
 
       {/* --- CREATION / EDIT MODALS --- */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in cursor-pointer" onClick={() => setActiveModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800 capitalize">
                 {activeModal.startsWith('edit_') 
@@ -522,8 +522,8 @@ export default function Locations() {
 
       {/* --- ROOM HELD ASSETS MODAL --- */}
       {showRoomAssetsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-slate-100 overflow-hidden max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in cursor-pointer" onClick={() => setShowRoomAssetsModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-slate-100 overflow-hidden max-h-[85vh] flex flex-col cursor-default" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">

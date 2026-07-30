@@ -486,8 +486,8 @@ export default function Assets() {
 
       {/* Register Asset Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm cursor-pointer" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800">Register Physical Asset</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
@@ -606,8 +606,8 @@ export default function Assets() {
 
       {/* Edit Asset Modal */}
       {showEditModal && editAssetData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-2xl max-w-lg w-full space-y-5 animate-fade-in max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm cursor-pointer" onClick={() => setShowEditModal(false)}>
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-2xl max-w-lg w-full space-y-5 animate-fade-in max-h-[90vh] overflow-y-auto cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-lg font-bold text-slate-800">Edit Asset: {editAssetData.assetCode}</h3>
@@ -716,8 +716,8 @@ export default function Assets() {
 
       {/* Assign Asset Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm cursor-pointer" onClick={() => setShowAssignModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800">Assign Custody</h3>
               <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
@@ -759,8 +759,8 @@ export default function Assets() {
 
       {/* Details Wide 3-Column Centered Popup Modal */}
       {showDetailsDrawer && selectedAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/65 backdrop-blur-sm animate-fade-in">
-          <div className="w-[95vw] max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden max-h-[92vh] animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-slate-950/65 backdrop-blur-sm animate-fade-in cursor-pointer" onClick={() => setShowDetailsDrawer(false)}>
+          <div className="w-[95vw] max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden max-h-[92vh] animate-fade-in cursor-default" onClick={(e) => e.stopPropagation()}>
             
             {/* 1. Header (Pinned Top) */}
             <div className="px-6 py-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0 border-b border-slate-800">

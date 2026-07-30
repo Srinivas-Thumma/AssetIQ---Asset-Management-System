@@ -7,6 +7,7 @@ import { Building } from '../models/Building.js';
 import { Floor } from '../models/Floor.js';
 import { Room } from '../models/Room.js';
 import { AiAuditLog } from '../models/AiAuditLog.js';
+import { MaintenanceRequest } from '../models/MaintenanceRequest.js';
 import { sendResponse } from '../utils/apiResponse.js';
 import { runWithTenant } from '../utils/tenantContext.js';
 
@@ -53,6 +54,47 @@ export const createOrganization = async (req, res, next) => {
 
     const populatedOrg = await Organization.findById(org._id).populate('planId');
     return sendResponse(res, 201, true, 'Organization created manually', populatedOrg);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createOrgAdmin = async (req, res, next) => {
+  try {
+    const { organizationId, email, password } = req.body;
+    if (!organizationId || !email || !password) {
+      return sendResponse(res, 400, false, 'organizationId, email, and password are required');
+    }
+
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      return sendResponse(res, 404, false, 'Organization not found');
+    }
+
+    const orgIdString = org._id.toString();
+
+    const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
+    if (existingUser) {
+      return sendResponse(res, 400, false, 'A user with this email address already exists');
+    }
+
+    let newUser;
+    await runWithTenant(orgIdString, async () => {
+      newUser = await User.create({
+        email: email.trim().toLowerCase(),
+        passwordHash: password,
+        role: 'org_admin',
+        organizationId: orgIdString
+      });
+    });
+
+    return sendResponse(res, 201, true, `Org Admin user created for ${org.name}`, {
+      _id: newUser._id,
+      email: newUser.email,
+      role: newUser.role,
+      organizationId: orgIdString,
+      organizationName: org.name
+    });
   } catch (err) {
     next(err);
   }
@@ -296,6 +338,24 @@ export const getStorageUsage = async (req, res, next) => {
     });
 
     return sendResponse(res, 200, true, 'Organization storage details retrieved successfully', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllGlobalTickets = async (req, res, next) => {
+  try {
+    const list = await MaintenanceRequest.find()
+      .populate('organizationId', 'name slug')
+      .populate({
+        path: 'assetId',
+        select: 'name assetCode status organizationId',
+        populate: { path: 'organizationId', select: 'name slug' }
+      })
+      .populate('raisedBy', 'email role')
+      .sort({ createdAt: -1 });
+
+    return sendResponse(res, 200, true, 'Global maintenance tickets retrieved', list);
   } catch (error) {
     next(error);
   }

@@ -141,26 +141,8 @@ export const login = async (req, res, next) => {
     const validated = loginSchema.parse(req.body);
 
     // Bypass tenant scope to find user globally (and verify organization is active)
-   const user = await User.findOne({ email: validated.email });
+    const user = await User.findOne({ email: validated.email });
 
-console.log("Login email:", validated.email);
-console.log("User:", user);
-
-if (user) {
-  console.log("Stored Hash:", user.passwordHash);
-
-  const bcrypt = (await import("bcryptjs")).default;
-
-  console.log(
-    "Compare password123:",
-    await bcrypt.compare("password123", user.passwordHash)
-  );
-
-  console.log(
-    "Compare entered password:",
-    await bcrypt.compare(validated.password, user.passwordHash)
-  );
-}
     if (!user) {
       return sendResponse(res, 401, false, 'Invalid credentials');
     }

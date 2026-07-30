@@ -1,6 +1,8 @@
 import { Asset } from '../models/Asset.js';
 import { AssetAssignment } from '../models/AssetAssignment.js';
 import { MaintenanceHistory } from '../models/MaintenanceHistory.js';
+import { MaintenanceRequest } from '../models/MaintenanceRequest.js';
+import { Warranty } from '../models/Warranty.js';
 import { Organization } from '../models/Organization.js';
 import { Category } from '../models/Category.js';
 import { Room } from '../models/Room.js';
@@ -12,9 +14,6 @@ import { sendResponse } from '../utils/apiResponse.js';
 
 export const getAssets = async (req, res, next) => {
   try {
-    console.log("req.orgId:", req.orgId);
-    console.log("req.user:", req.user);
-
     const { status, categoryId, roomId, assignedTo, search } = req.query;
     const filter = {};
 
@@ -174,6 +173,13 @@ export const createAsset = async (req, res, next) => {
   }
 };
 
+/**
+ * Updates asset metadata and manages status lifecycle transitions.
+ * Lifecycle Rule (Option B):
+ * - Setting `status = 'damaged'` keeps asset status as 'damaged' (reported broken) and auto-generates
+ *   an open corrective MaintenanceRequest.
+ * - Transition from 'damaged' to 'under_maintenance' occurs downstream when work begins (status becomes 'assigned' or 'in_progress').
+ */
 export const updateAsset = async (req, res, next) => {
   try {
     const { name, categoryId, roomId, purchasePrice, vendorId, status } = req.body;
@@ -188,7 +194,29 @@ export const updateAsset = async (req, res, next) => {
     if (roomId) asset.roomId = roomId;
     if (purchasePrice) asset.purchasePrice = purchasePrice;
     if (vendorId) asset.vendorId = vendorId;
-    if (status) asset.status = status;
+    if (status === 'damaged') {
+      asset.status = 'damaged';
+
+      const existingActiveTicket = await MaintenanceRequest.findOne({
+        assetId: asset._id,
+        status: { $in: ['open', 'in_progress', 'assigned'] }
+      });
+
+      if (!existingActiveTicket) {
+        await MaintenanceRequest.create({
+          organizationId: req.orgId || asset.organizationId,
+          assetId: asset._id,
+          raisedBy: req.user?._id || asset.organizationId,
+          type: 'corrective',
+          priority: 'high',
+          description: `Auto-generated corrective maintenance request: Asset reported damaged (${asset.name}).`,
+          scheduledDate: new Date(),
+          status: 'open',
+        });
+      }
+    } else if (status) {
+      asset.status = status;
+    }
 
     await asset.save();
 
@@ -198,6 +226,12 @@ export const updateAsset = async (req, res, next) => {
   }
 };
 
+/**
+ * Deletes or retires an asset.
+ * Hard-Delete Safety Guard:
+ * Performs parallel checks across MaintenanceRequest, MaintenanceHistory, Warranty, and AssetAssignment.
+ * Assets with any historical records cannot be hard-deleted to preserve audit integrity; they must be soft-retired (`mode=retire`).
+ */
 export const deleteAsset = async (req, res, next) => {
   try {
     const { mode } = req.query;
@@ -210,6 +244,23 @@ export const deleteAsset = async (req, res, next) => {
       asset.status = 'retired';
       await asset.save();
       return sendResponse(res, 200, true, 'Asset status updated to retired', asset);
+    }
+
+    // Safety Guard: Block hard delete if maintenance, warranty, or assignment records exist
+    const [hasMaintenanceReq, hasMaintenanceHist, hasWarranty, hasAssignment] = await Promise.all([
+      MaintenanceRequest.exists({ assetId: asset._id }),
+      MaintenanceHistory.exists({ assetId: asset._id }),
+      Warranty.exists({ assetId: asset._id }),
+      AssetAssignment.exists({ assetId: asset._id }),
+    ]);
+
+    if (hasMaintenanceReq || hasMaintenanceHist || hasWarranty || hasAssignment) {
+      return sendResponse(
+        res,
+        400,
+        false,
+        'Cannot hard delete asset because maintenance, warranty, or custody assignment records are attached to it. Please use the Retire option instead.'
+      );
     }
 
     // Permanent hard deletion

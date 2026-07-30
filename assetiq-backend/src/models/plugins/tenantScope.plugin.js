@@ -2,15 +2,15 @@ import { getTenantId } from '../../utils/tenantContext.js';
 
 /**
  * Tenant Scoping Plugin:
- * - Automatically injects organizationId into all schema models that register this plugin.
- * - Enforces index scoping and pre-hooks to isolate data between tenants.
+ * Automatically injects `organizationId` into schema models and attaches pre-hooks to intercept
+ * Mongoose queries and document saves. Isolates database records per organization without requiring explicit `.where({ organizationId })` on every controller query.
  * 
  * Connection Workflow:
- * - Reads getTenantId() from AsyncLocalStorage (set by tenantScope middleware).
- * - Appends organizationId query scope to all reads/writes.
+ * - Reads `getTenantId()` from AsyncLocalStorage (set by tenantScope HTTP middleware).
+ * - Dynamically appends `{ organizationId: tenantId }` to all read/write database operations.
  */
 export function tenantScopePlugin(schema) {
-  // Add organizationId field if it doesn't already exist
+  // Ensure schema possesses indexed organizationId field
   if (!schema.path('organizationId')) {
     schema.add({
       organizationId: {
@@ -21,7 +21,7 @@ export function tenantScopePlugin(schema) {
     });
   }
 
-  // Pre-query hook to automatically scope database queries to the tenant
+  // Pre-query hook to automatically append tenantId filter to database queries
   const autoScopeQuery = function (next) {
     const tenantId = getTenantId();
     if (tenantId) {

@@ -90,26 +90,54 @@ export default function MaintenanceChatDrawer({ request, onClose }) {
     scrollToBottom();
   }, [messages]);
 
-  // 3. Send Message Handler
-  const handleSendMessage = (e) => {
+  // 3. Send Message Handler (Supports WebSocket with REST POST Fallback)
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputText.trim() || !socket || !isConnected) return;
+    if (!inputText.trim() || isSending) return;
 
     const messageText = inputText.trim();
     setInputText('');
     setIsSending(true);
+    setErrorMsg(null);
 
-    socket.emit('chat:message', {
-      requestId: request._id,
-      message: messageText,
-    });
-
-    setIsSending(false);
+    try {
+      if (socket && isConnected) {
+        socket.emit('chat:message', {
+          requestId: request._id,
+          message: messageText,
+        });
+      } else {
+        // Fallback REST POST request when socket is reconnecting or offline
+        const res = await apiCall(`/api/v1/maintenance/${request._id}/messages`, {
+          method: 'POST',
+          body: JSON.stringify({ message: messageText }),
+        });
+        if (res.success && res.data) {
+          setMessages((prev) => {
+            if (prev.some((m) => m._id === res.data._id)) return prev;
+            return [...prev, res.data];
+          });
+        } else {
+          setErrorMsg(res.message || 'Failed to send message');
+        }
+      }
+    } catch (err) {
+      console.error('Send message error:', err);
+      setErrorMsg('Failed to send message');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-6 animate-fade-in">
-      <div className="w-full max-w-5xl h-[85vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 font-sans">
+    <div 
+      className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 md:p-6 animate-fade-in cursor-pointer"
+      onClick={onClose}
+    >
+      <div 
+        className="w-full max-w-5xl h-[85vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 font-sans cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Widescreen Header */}
         <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
@@ -228,14 +256,14 @@ export default function MaintenanceChatDrawer({ request, onClose }) {
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder={isConnected ? "Message team about this ticket..." : "Connecting to chat..."}
-              disabled={!isConnected || loading}
+              placeholder="Message team about this ticket..."
+              disabled={loading || isSending}
               className="flex-1 bg-transparent border-0 py-2 px-1 text-sm text-slate-800 focus:outline-none placeholder-slate-400 font-medium disabled:opacity-50"
             />
 
             <button
               type="submit"
-              disabled={!inputText.trim() || !isConnected || isSending}
+              disabled={!inputText.trim() || isSending}
               className="p-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:cursor-not-allowed shadow-md shadow-blue-600/15 shrink-0"
               title="Send Message"
             >

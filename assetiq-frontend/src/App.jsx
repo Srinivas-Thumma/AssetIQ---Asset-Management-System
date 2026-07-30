@@ -238,7 +238,7 @@ function AppContent() {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       {/* Sidebar Panel - Icon-only default (w-20), expands on hover (w-64) */}
-      <aside className="w-20 hover:w-64 transition-all duration-300 ease-in-out group bg-white border-r border-slate-100 flex flex-col shrink-0 overflow-hidden shadow-lg hover:shadow-2xl z-40 relative">
+      <aside className="w-20 hover:w-64 transition-all duration-300 ease-in-out group bg-white border-r border-slate-100 flex flex-col shrink-0 overflow-hidden shadow-lg hover:shadow-2xl z-20 relative">
         
         {/* Branding header (Hidden when not hovering, fades in smoothly on hover) */}
         <div className="h-16 flex items-center px-4 border-b border-slate-100 shrink-0">
@@ -527,32 +527,59 @@ function AppContent() {
             })
             .map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const isActive = activeTab === item.id && (item.id !== 'superadmin' || !superAdminSubTab || superAdminSubTab === 'organizations');
               const hasUnreadChat = item.id === 'maintenance' && notifications.some((n) => !n.read && n.type === 'chat_message');
 
               return (
-                <button
-                  key={item.id}
-                  onClick={() => handleTabNavigate(item.id)}
-                  title={item.label}
-                  className="w-full flex items-center gap-4 px-1 py-1 rounded-xl text-sm font-semibold transition-all cursor-pointer"
-                >
-                  <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 transition-all relative ${
-                    isActive 
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25' 
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                  }`}>
-                    <Icon className="h-5 w-5" />
-                    {hasUnreadChat && (
-                      <span className="absolute top-1 right-1 h-3 w-3 rounded-full bg-rose-600 animate-pulse border-2 border-white" />
-                    )}
-                  </div>
-                  <span className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap overflow-hidden text-ellipsis ${
-                    isActive ? 'text-blue-600 font-bold' : 'text-slate-600'
-                  }`}>
-                    {item.label}
-                  </span>
-                </button>
+                <React.Fragment key={item.id}>
+                  <button
+                    onClick={() => handleTabNavigate(item.id)}
+                    title={item.label}
+                    className="w-full flex items-center gap-4 px-1 py-1 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+                  >
+                    <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 transition-all relative ${
+                      isActive 
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25' 
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                    }`}>
+                      <Icon className="h-5 w-5" />
+                      {hasUnreadChat && (
+                        <span className="absolute top-1 right-1 h-3 w-3 rounded-full bg-rose-600 animate-pulse border-2 border-white" />
+                      )}
+                    </div>
+                    <span className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap overflow-hidden text-ellipsis ${
+                      isActive ? 'text-blue-600 font-bold' : 'text-slate-600'
+                    }`}>
+                      {item.label}
+                    </span>
+                  </button>
+
+                  {/* Render Global Tickets right below Dashboard for Super Admin */}
+                  {user.role === 'super_admin' && item.id === 'dashboard' && (
+                    <button
+                      onClick={() => {
+                        setSuperAdminSubTab('tickets');
+                        setSuperAdminAutoOpenModal(false);
+                        handleTabNavigate('superadmin');
+                      }}
+                      title="Global Maintenance Tickets"
+                      className="w-full flex items-center gap-4 px-1 py-1 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+                    >
+                      <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                        activeTab === 'superadmin' && superAdminSubTab === 'tickets' && !superAdminAutoOpenModal
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25' 
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                      }`}>
+                        <Wrench className="h-5 w-5" />
+                      </div>
+                      <span className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap overflow-hidden text-ellipsis ${
+                        activeTab === 'superadmin' && superAdminSubTab === 'tickets' && !superAdminAutoOpenModal ? 'text-blue-600 font-bold' : 'text-slate-600'
+                      }`}>
+                        Global Tickets
+                      </span>
+                    </button>
+                  )}
+                </React.Fragment>
               );
             })}
         </nav>
@@ -590,12 +617,6 @@ function AppContent() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Optional top info bar if super admin is switching tenant scope */}
-        {user.role === 'super_admin' && (
-          <div className="bg-blue-600 text-white px-6 py-2 text-xs font-semibold text-center select-none shadow-sm">
-            🛡️ platform super admin authority active. cross-tenant database filters are bypassed.
-          </div>
-        )}
         <div className="flex-1 overflow-y-auto px-8 py-6">
           {renderActiveView()}
         </div>

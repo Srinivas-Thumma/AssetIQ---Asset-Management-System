@@ -5,6 +5,7 @@ import {
   Mail, Phone, MapPin, Hash, Briefcase, Key, ShieldAlert, Edit2, Trash2, X, Eye, EyeOff 
 } from 'lucide-react';
 import CustomSelect from '../components/ui/CustomSelect';
+import OffboardingChecklistModal from '../components/OffboardingChecklistModal';
 
 export default function OrganizationSetup({ initialSubTab = 'departments', onSubTabChange }) {
   const { apiCall, user } = useAuth();
@@ -28,6 +29,7 @@ export default function OrganizationSetup({ initialSubTab = 'departments', onSub
 
   // Eye view modal state
   const [viewingEntity, setViewingEntity] = useState(null); // { type: 'vendor' | 'employee', data, assets: [] }
+  const [offboardingEmployee, setOffboardingEmployee] = useState(null);
 
   // Form submits state
   const [submitting, setSubmitting] = useState(false);
@@ -119,6 +121,15 @@ export default function OrganizationSetup({ initialSubTab = 'departments', onSub
   };
 
   const handleDelete = async (type, id) => {
+    if (type === 'employees') {
+      const emp = employees.find(e => e._id === id);
+      const empAssets = allAssets.filter(a => (a.assignedTo?._id || a.assignedTo || '').toString() === id.toString());
+      if (empAssets.length > 0) {
+        setOffboardingEmployee({ id, name: emp?.name || 'Employee' });
+        return;
+      }
+    }
+
     if (!window.confirm(`Are you sure you want to delete this ${type.slice(0,-1)}? This cannot be undone.`)) return;
     setRefreshing(true);
     setError('');
@@ -129,7 +140,12 @@ export default function OrganizationSetup({ initialSubTab = 'departments', onSub
       if (res.success) {
         fetchData();
       } else {
-        setError(res.message || `Failed to delete from ${type}`);
+        if (type === 'employees' && res.message?.toLowerCase().includes('asset')) {
+          const emp = employees.find(e => e._id === id);
+          setOffboardingEmployee({ id, name: emp?.name || 'Employee' });
+        } else {
+          setError(res.message || `Failed to delete from ${type}`);
+        }
       }
     } catch (err) {
       setError('A connection issue occurred.');
@@ -719,8 +735,8 @@ export default function OrganizationSetup({ initialSubTab = 'departments', onSub
 
       {/* Add / Edit Employee Modal */}
       {showEmployeeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in cursor-pointer" onClick={() => setShowEmployeeModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-100 overflow-hidden cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-blue-400" />
@@ -873,8 +889,8 @@ export default function OrganizationSetup({ initialSubTab = 'departments', onSub
 
       {/* Asset Holdings Eye View Modal */}
       {viewingEntity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in cursor-pointer" onClick={() => setViewingEntity(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl border border-slate-100 overflow-hidden flex flex-col max-h-[85vh] cursor-default" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
@@ -961,6 +977,34 @@ export default function OrganizationSetup({ initialSubTab = 'departments', onSub
             </div>
           </div>
         </div>
+      )}
+      {/* Offboarding Checklist Modal */}
+      {offboardingEmployee && (
+        <OffboardingChecklistModal
+          isOpen={true}
+          onClose={() => setOffboardingEmployee(null)}
+          employeeId={offboardingEmployee.id}
+          employeeName={offboardingEmployee.name}
+          onReturnAll={async (empId) => {
+            try {
+              const returnRes = await apiCall(`/api/v1/offboarding/${empId}/return-all`, { method: 'POST' });
+              if (returnRes.success) {
+                const delRes = await apiCall(`/api/v1/lookups/employees/${empId}`, { method: 'DELETE' });
+                if (!delRes.success) {
+                  setError(delRes.message || 'Failed to complete employee deletion after returning assets');
+                }
+              } else {
+                setError(returnRes.message || 'Failed to return employee assets');
+              }
+            } catch (err) {
+              console.error('Offboarding failed:', err);
+              setError('Offboarding process encountered a network error.');
+            } finally {
+              setOffboardingEmployee(null);
+              await fetchData();
+            }
+          }}
+        />
       )}
     </div>
   );

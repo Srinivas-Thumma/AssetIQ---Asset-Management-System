@@ -12,12 +12,15 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (user) {
-      // Connect to Socket.IO backend on http://localhost:5000 with credentials cookies
-      const socketInstance = io('http://localhost:5000', {
+      const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? `http://${window.location.hostname}:5000`
+        : window.location.origin;
+
+      const socketInstance = io(socketUrl, {
         withCredentials: true,
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 10,
+        reconnectionAttempts: 20,
         reconnectionDelay: 1000,
       });
 
@@ -34,8 +37,12 @@ export const SocketProvider = ({ children }) => {
       });
 
       socketInstance.on('connect_error', (err) => {
-        console.warn('⚠️ Socket Connection Error:', err.message);
         setIsConnected(false);
+        // Suppress console warning when socket connects before auth cookie is established or during logout
+        if (err?.message?.includes('No token provided') || err?.message?.includes('Authentication failed')) {
+          return;
+        }
+        console.warn('⚠️ Socket Connection Error:', err.message);
       });
 
       setSocket(socketInstance);

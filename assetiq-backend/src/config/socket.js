@@ -7,6 +7,16 @@ import { Asset } from '../models/Asset.js';
 import { Notification } from '../models/Notification.js';
 import { User } from '../models/User.js';
 
+/**
+ * Socket.IO Real-Time Engine & Room Isolation Infrastructure:
+ * Manages WebSocket connections for live maintenance chat and real-time push notifications.
+ * 
+ * Room Architecture & Isolation Strategy:
+ * 1. User Private Room (`user:<userId>`): Receives direct personal notifications (e.g. ticket assignments, chat mentions).
+ * 2. Organization Room (`org:<orgId>`): Receives tenant-wide announcements.
+ * 3. Chat Room (`chat:request:<requestId>`): Isolated channel for ticket maintenance messaging with strict RBAC permission guards.
+ */
+
 let io = null;
 
 const checkChatAccessPermission = async (socket, requestId) => {
@@ -53,7 +63,7 @@ const checkChatAccessPermission = async (socket, requestId) => {
 export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: 'http://localhost:5173', // Must match exact frontend origin for credentials cookies
+      origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
       credentials: true,
     },
   });

@@ -6,7 +6,6 @@ import { User } from '../../src/models/User.js';
 import { Plan } from '../../src/models/Plan.js';
 import { Asset } from '../../src/models/Asset.js';
 import { Employee } from '../../src/models/Employee.js';
-import AssetRequest from '../../src/models/AssetRequest.js';
 import PlatformBanner from '../../src/models/PlatformBanner.js';
 
 const runMasterElevationVerification = async () => {
@@ -64,18 +63,6 @@ const runMasterElevationVerification = async () => {
       purchaseDate: new Date(),
     });
     assetId = asset._id;
-
-    // Create Asset Request
-    const request = await AssetRequest.create({
-      organizationId: org._id,
-      requesterId: user._id,
-      targetEmployeeId: emp._id,
-      type: 'new_request',
-      status: 'pending',
-      notes: 'Need standing desk converter for ergonomics',
-    });
-
-    console.log('✅ AssetRequest created successfully:', request._id);
   });
 
   // 4. Test Return All Offboarding Logic

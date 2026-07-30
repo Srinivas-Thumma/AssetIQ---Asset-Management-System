@@ -69,6 +69,12 @@ export const createMaintenanceRequest = async (req, res, next) => {
   }
 };
 
+/**
+ * Updates maintenance ticket status or servicing schedule.
+ * Lifecycle Transition Trigger:
+ * When ticket status transitions to 'assigned' or 'in_progress' (indicating repair work has commenced),
+ * the linked Asset status is automatically updated from 'damaged' or 'available' to 'under_maintenance'.
+ */
 export const updateMaintenanceRequest = async (req, res, next) => {
   try {
     const { status, priority, description, scheduledDate } = req.body;
@@ -85,7 +91,7 @@ export const updateMaintenanceRequest = async (req, res, next) => {
 
     await request.save();
 
-    // If request status manually updated to assigned / in_progress, ensure asset reflects under_maintenance
+    // Work Commenced Trigger: Automatically transition asset status to 'under_maintenance'
     if (['assigned', 'in_progress'].includes(status)) {
       const asset = await Asset.findById(request.assetId);
       if (asset && asset.status !== 'under_maintenance') {
@@ -100,6 +106,12 @@ export const updateMaintenanceRequest = async (req, res, next) => {
   }
 };
 
+/**
+ * Resolves a maintenance ticket, logs repair history & costs, and restores asset status.
+ * Custody State Restoration:
+ * If the asset possesses an `assignedTo` custody record, its status is restored to 'assigned'.
+ * If unassigned, its status is reset to 'available'.
+ */
 export const completeMaintenance = async (req, res, next) => {
   try {
     const { cost, findings, actionsTaken } = req.body;
@@ -132,10 +144,14 @@ export const completeMaintenance = async (req, res, next) => {
       actionsTaken,
     });
 
-    // 3. Reset Asset Status back to available (or assigned depending on history, but default is available)
+    // 3. Reset Asset Status: If asset has an assignedTo custody record, restore status to 'assigned'. Otherwise reset to 'available'.
     const asset = await Asset.findById(request.assetId);
     if (asset) {
-      asset.status = 'available';
+      if (asset.assignedTo) {
+        asset.status = 'assigned';
+      } else {
+        asset.status = 'available';
+      }
       await asset.save();
 
       // 4. Trigger AI Health score recalculation (since asset has new repair logs)
