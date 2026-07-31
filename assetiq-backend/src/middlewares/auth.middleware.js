@@ -9,6 +9,7 @@ import { User } from '../models/User.js';
  * - Ensures user account is active.
  * Shared between HTTP protect middleware and Socket.IO handshake auth middleware.
  */
+
 export const verifyTokenAndGetUser = async (token) => {
   if (!token) {
     const error = new Error('No authentication token provided');
@@ -38,6 +39,7 @@ export const verifyTokenAndGetUser = async (token) => {
  * Authentication Gatekeeper Middleware:
  * - Checks, extracts, and verifies the accessToken HTTP-only cookie on every incoming API request.
  */
+
 export const protect = async (req, res, next) => {
   const token = req.cookies?.accessToken;
 

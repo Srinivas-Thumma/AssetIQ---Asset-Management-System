@@ -205,25 +205,30 @@ Return ONLY a JSON object with this exact structure — the values below are pla
 
 Do not include markdown, code fences, or any text outside the JSON object.`;
 
-    // Fetch available models from Ollama to pick a valid one
+    // Preferred models in order of speed and JSON adherence
+    const preferredModels = ['qwen2.5:3b', 'llama3.1:8b', 'mistral:latest', 'llama2:latest', 'deepseek-r1:1.5b'];
     let targetModel = 'llama3.1:8b';
+
     try {
       const tagsRes = await fetch(`${env.OLLAMA_URL}/api/tags`);
       if (tagsRes.ok) {
         const tagsData = await tagsRes.json();
         const availableNames = (tagsData.models || []).map(m => m.name);
         
-        if (!availableNames.includes(targetModel) && availableNames.length > 0) {
-          targetModel = availableNames[0]; // Fallback to first available model (e.g. mistral:latest)
-          console.log(`🤖 AI: Model 'llama3.1:8b' not found in local Ollama. Falling back to '${targetModel}'`);
+        const matched = preferredModels.find(m => availableNames.includes(m));
+        if (matched) {
+          targetModel = matched;
+        } else if (availableNames.length > 0) {
+          targetModel = availableNames[0];
         }
+        console.log(`🤖 AI Service: Selected local model '${targetModel}' for asset analysis`);
       }
     } catch (err) {
       console.warn('⚠️ AI: Failed to query available models, using default targetModel:', err.message);
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000); // Expanded timeout for local inference
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for local inference
 
     const response = await fetch(`${env.OLLAMA_URL}/api/generate`, {
       method: 'POST',
@@ -246,7 +251,13 @@ Do not include markdown, code fences, or any text outside the JSON object.`;
     }
 
     const responseData = await response.json();
-    const parsedContent = JSON.parse(responseData.response);
+    let rawText = responseData.response || '';
+
+    // Sanitize response text: remove <think>...</think> blocks or ```json markdown wrappers
+    rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    const parsedContent = JSON.parse(rawText);
 
     if (
       typeof parsedContent.healthScore !== 'number' ||

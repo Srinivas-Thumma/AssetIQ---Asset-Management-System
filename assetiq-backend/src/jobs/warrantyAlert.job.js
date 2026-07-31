@@ -8,7 +8,7 @@ import { getIO } from '../config/socket.js';
 
 export const startWarrantyJob = () => {
   // Run daily at 01:00 AM
-  cron.schedule('0 * * * *', async () => {
+  cron.schedule('* 0 * * *', async () => {
     console.log('⏰ Warranty Alert Job: Running daily check...');
     try {
       const thirtyDaysFromNow = new Date();

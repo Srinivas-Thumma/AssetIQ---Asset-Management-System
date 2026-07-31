@@ -9,6 +9,7 @@ import { getTenantId } from '../../utils/tenantContext.js';
  * - Reads `getTenantId()` from AsyncLocalStorage (set by tenantScope HTTP middleware).
  * - Dynamically appends `{ organizationId: tenantId }` to all read/write database operations.
  */
+
 export function tenantScopePlugin(schema) {
   // Ensure schema possesses indexed organizationId field
   if (!schema.path('organizationId')) {

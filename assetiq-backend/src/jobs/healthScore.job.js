@@ -3,8 +3,8 @@ import { Asset } from '../models/Asset.js';
 import { analyzeAssetHealth } from '../services/ai.service.js';
 
 export const startHealthScoreJob = () => {
-  // Run every minute
-  cron.schedule('0 * * * *', async () => {
+  // Run every day
+  cron.schedule('* 0 * * *', async () => {
     console.log('⏰ AI Health Score Job: Starting nightly calculations...');
     try {
       // Find all assets that are not retired
