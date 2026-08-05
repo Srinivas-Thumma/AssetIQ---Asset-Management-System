@@ -18,6 +18,9 @@ export const recomputeHealthScore = async (req, res, next) => {
       lastAnalyzedAt: analysis.lastAnalyzedAt,
       predictedNextMaintenanceDate: analysis.predictedNextMaintenanceDate || null,
       failureRiskPercent: analysis.failureRiskPercent || 0,
+      remainingUsefulLifeMonths: analysis.remainingUsefulLifeMonths ?? null,
+      replacementRecommendation: analysis.replacementRecommendation ?? null,
+      priority: analysis.priority ?? null,
     };
 
     await asset.save();
@@ -40,3 +43,31 @@ export const getHealthScoreStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+export const summarizeTicket = async (req, res, next) => {
+  try {
+    const { requestId } = req.params;
+    const { getOrCreateMaintenanceConversation, getConversationMessages } = await import('../services/conversation.service.js');
+    const { summarizeTicketThread } = await import('../services/ai.service.js');
+
+    const conversation = await getOrCreateMaintenanceConversation(requestId, req.orgId);
+    const { messages } = await getConversationMessages(req.user, conversation._id);
+    const summary = await summarizeTicketThread(messages);
+
+    return sendResponse(res, 200, true, 'Ticket conversation summarized', summary);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTriageSuggestion = async (req, res, next) => {
+  try {
+    const { description } = req.body;
+    const { suggestTicketTriage } = await import('../services/ai.service.js');
+    const triage = suggestTicketTriage(description);
+    return sendResponse(res, 200, true, 'AI triage suggestion generated', triage);
+  } catch (error) {
+    next(error);
+  }
+};
+

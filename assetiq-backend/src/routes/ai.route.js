@@ -4,7 +4,9 @@ import { tenantScope } from '../middlewares/tenant.middleware.js';
 import { requireRole } from '../middlewares/rbac.middleware.js';
 import {
   recomputeHealthScore,
-  getHealthScoreStatus
+  getHealthScoreStatus,
+  summarizeTicket,
+  getTriageSuggestion,
 } from '../controllers/ai.controller.js';
 
 const router = express.Router();
@@ -15,5 +17,7 @@ router.use(tenantScope);
 
 router.post('/recompute/:assetId', requireRole('org_admin', 'super_admin', 'asset_manager'), recomputeHealthScore);
 router.get('/status/:assetId', getHealthScoreStatus);
+router.post('/summarize-ticket/:requestId', summarizeTicket);
+router.post('/triage-suggestion', getTriageSuggestion);
 
 export default router;

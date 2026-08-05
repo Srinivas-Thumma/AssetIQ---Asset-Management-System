@@ -5,6 +5,7 @@ import { connectDB } from './src/config/db.js';
 import { initSocket } from './src/config/socket.js';
 import { startWarrantyJob } from './src/jobs/warrantyAlert.job.js';
 import { startHealthScoreJob } from './src/jobs/healthScore.job.js';
+import { startSlaCheckJob } from './src/jobs/slaCheck.job.js';
 import { Plan } from './src/models/Plan.js';
 import { User } from './src/models/User.js';
 
@@ -60,6 +61,7 @@ const startServer = async () => {
   // 3. Start Background Jobs
   startWarrantyJob();
   startHealthScoreJob();
+  startSlaCheckJob();
 
   // 4. Create HTTP Server & Attach Socket.IO Infrastructure
   const server = http.createServer(app);

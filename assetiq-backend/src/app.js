@@ -19,6 +19,10 @@ import adminRouter from './routes/admin.route.js';
 import notificationRouter from './routes/notification.route.js';
 import offboardingRouter from './routes/offboarding.route.js';
 import platformBannerRouter from './routes/platformBanner.route.js';
+import conversationRouter from './routes/conversation.route.js';
+import approvalRouter from './routes/approval.route.js';
+import timelineRouter from './routes/timeline.route.js';
+import searchRouter from './routes/search.route.js';
 
 const app = express();
 
@@ -77,6 +81,10 @@ app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/notifications', notificationRouter);
 app.use('/api/v1/offboarding', offboardingRouter);
 app.use('/api/v1/platform', platformBannerRouter);
+app.use('/api/v1/conversations', conversationRouter);
+app.use('/api/v1/approvals', approvalRouter);
+app.use('/api/v1/timelines', timelineRouter);
+app.use('/api/v1/search', searchRouter);
 
 // Global Error Handler
 app.use(errorHandler);

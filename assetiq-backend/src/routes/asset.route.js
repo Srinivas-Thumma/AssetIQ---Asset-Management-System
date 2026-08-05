@@ -22,7 +22,8 @@ router.use(tenantScope);
 // Assets CRUD
 router.route('/')
   .get(getAssets)
-  .post(requireRole('org_admin', 'super_admin', 'asset_manager'), createAsset);
+  // super_admin is intentionally excluded: they manage organisations, not individual assets.
+  .post(requireRole('org_admin', 'asset_manager'), createAsset);
 
 router.route('/:id')
   .get(getAssetById)

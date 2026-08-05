@@ -99,14 +99,9 @@ export const createAsset = async (req, res, next) => {
       return sendResponse(res, 400, false, 'All fields are required');
     }
 
-    // Check role/organization context
-    if (req.user?.role === 'super_admin' || !req.orgId) {
-      return sendResponse(res, 403, false, 'Only Organization Admins and Asset Managers can add assets. Super Admins manage platform organization controls.');
-    }
-
     const org = await Organization.findById(req.orgId).populate("planId");
     if (!org) {
-      return sendResponse(res, 400, false, 'Only Organization Admins and Asset Managers can add assets. Super Admins manage platform organization controls.');
+      return sendResponse(res, 400, false, 'Organization not found or invalid context.');
     }
 
     const planLimit = org.planId ? org.planId.maxAssets : 100;
@@ -163,6 +158,9 @@ export const createAsset = async (req, res, next) => {
       lastAnalyzedAt: initialAiResult.lastAnalyzedAt,
       predictedNextMaintenanceDate: initialAiResult.predictedNextMaintenanceDate || null,
       failureRiskPercent: initialAiResult.failureRiskPercent || 0,
+      remainingUsefulLifeMonths: initialAiResult.remainingUsefulLifeMonths ?? null,
+      replacementRecommendation: initialAiResult.replacementRecommendation ?? null,
+      priority: initialAiResult.priority ?? null,
     };
 
     await asset.save();

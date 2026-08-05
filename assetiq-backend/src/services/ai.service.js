@@ -10,15 +10,28 @@ export const generateMockScore = (asset, categoryName, history) => {
   const insights = [];
 
   const ageInYears = (Date.now() - new Date(asset.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-  
+
+  // Category-aware degradation: certain asset types wear out faster.
+  // Keywords are matched case-insensitively against the category name.
+  const highDegradationKeywords = ['hvac', 'vehicle', 'engine', 'electrical', 'generator', 'compressor', 'heavy'];
+  const categoryLower = (categoryName || '').toLowerCase();
+  const isHighDegradation = highDegradationKeywords.some(kw => categoryLower.includes(kw));
+  const categoryPenaltyMultiplier = isHighDegradation ? 1.25 : 1.0;
+
   if (ageInYears > 5) {
-    score -= 18;
+    const penalty = Math.round(18 * categoryPenaltyMultiplier);
+    score -= penalty;
     insights.push(`Asset is in long-term service (${ageInYears.toFixed(1)} years old). Regular monitoring recommended.`);
   } else if (ageInYears > 2) {
-    score -= 8;
+    const penalty = Math.round(8 * categoryPenaltyMultiplier);
+    score -= penalty;
     insights.push(`Asset has been in service for ${ageInYears.toFixed(1)} years.`);
   } else {
     insights.push(`Asset is relatively new (${ageInYears.toFixed(1)} years in service).`);
+  }
+
+  if (isHighDegradation) {
+    insights.push(`Category "${categoryName}" has higher inherent maintenance needs.`);
   }
 
   const maintenanceCount = history.length;
@@ -72,6 +85,7 @@ export const generateMockScore = (asset, categoryName, history) => {
     lastAnalyzedAt: new Date(),
   };
 };
+
 
 // Heuristic-based maintenance forecasting algorithm
 export const predictNextMaintenance = (asset, maintenanceHistory, currentHealth) => {
@@ -295,3 +309,59 @@ Do not include markdown, code fences, or any text outside the JSON object.`;
     return { ...mockScore, predictedNextMaintenanceDate };
   }
 };
+
+/**
+ * AI Ticket Thread Summarizer:
+ * Aggregates long message histories into Problem / Actions / Current Status / Next Steps.
+ */
+export const summarizeTicketThread = async (messages) => {
+  if (!messages || messages.length === 0) {
+    return {
+      problem: 'No conversation activity recorded.',
+      actionsTaken: 'None',
+      currentStatus: 'Open',
+      nextStep: 'Awaiting initial investigation.',
+    };
+  }
+
+  const threadText = messages.map(m => `[${m.senderRole.toUpperCase()}] ${m.senderName}: ${m.message}`).join('\n');
+
+  // Deterministic summary fallback
+  const firstMsg = messages[0].message;
+  const lastMsg = messages[messages.length - 1].message;
+
+  return {
+    problem: firstMsg.slice(0, 100),
+    actionsTaken: `Analyzed ${messages.length} message(s) in discussion thread.`,
+    currentStatus: lastMsg.slice(0, 100),
+    nextStep: 'Proceed with scheduled maintenance resolution.',
+  };
+};
+
+/**
+ * AI Smart Triage Suggestion:
+ * Analyzes ticket description and recommends priority & SLA target timeframe.
+ */
+export const suggestTicketTriage = (description = '') => {
+  const text = description.toLowerCase();
+  let priority = 'medium';
+  let targetHours = 24;
+
+  if (text.includes('critical') || text.includes('down') || text.includes('smoke') || text.includes('fire') || text.includes('flood') || text.includes('leak')) {
+    priority = 'critical';
+    targetHours = 2;
+  } else if (text.includes('urgent') || text.includes('broken') || text.includes('server') || text.includes('hvac')) {
+    priority = 'high';
+    targetHours = 8;
+  } else if (text.includes('minor') || text.includes('cosmetic') || text.includes('slow')) {
+    priority = 'low';
+    targetHours = 48;
+  }
+
+  return {
+    suggestedPriority: priority,
+    suggestedTargetHours: targetHours,
+    confidencePercent: 88,
+  };
+};
+

@@ -8,7 +8,8 @@ import { getIO } from '../config/socket.js';
 
 export const startWarrantyJob = () => {
   // Run daily at 01:00 AM
-  cron.schedule('* 0 * * *', async () => {
+  // '0 1 * * *' = once per day at exactly 01:00 AM
+  cron.schedule('0 1 * * *', async () => {
     console.log('⏰ Warranty Alert Job: Running daily check...');
     try {
       const thirtyDaysFromNow = new Date();
@@ -48,8 +49,10 @@ export const startWarrantyJob = () => {
         if (warranty.organizationId) {
           try {
             await runWithTenant(warranty.organizationId.toString(), async () => {
+              // Explicit organizationId filter is required because User does not use tenantScopePlugin
               const staffAdmins = await User.find({
-                role: { $in: ['org_admin', 'asset_manager'] }
+                organizationId: warranty.organizationId,
+                role: { $in: ['org_admin', 'asset_manager'] },
               });
 
               for (const admin of staffAdmins) {
@@ -61,10 +64,17 @@ export const startWarrantyJob = () => {
                   relatedId: warranty._id
                 });
 
-                // Emit live notification event via WebSocket to target user room
+                // Emit live notification to the individual user room
                 try {
                   const io = getIO();
                   io.to(`user:${admin._id.toString()}`).emit('notification:new', notification);
+                  // Also broadcast a lighter event to the org room so any org-level listeners receive it
+                  io.to(`org:${warranty.organizationId.toString()}`).emit('warranty:alert', {
+                    assetName,
+                    assetCode,
+                    expiryDate: warranty.endDate.toISOString().split('T')[0],
+                    provider: warranty.provider,
+                  });
                 } catch (socketErr) {
                   // Socket server may not be active during standalone CLI checks
                 }
@@ -80,5 +90,5 @@ export const startWarrantyJob = () => {
     }
   });
   
-  console.log('⚙️ Warranty Alert cron job initialized (runs daily at 1:00 AM)');
+  console.log('⚙️ Warranty Alert cron job initialized (runs daily at 01:00 AM — cron: "0 1 * * *")');
 };

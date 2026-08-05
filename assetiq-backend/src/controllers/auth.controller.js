@@ -261,7 +261,9 @@ export const createOrgUser = async (req, res, next) => {
 
 export const getOrgUsers = async (req, res, next) => {
   try {
-    const users = await User.find()
+    // Explicit organizationId filter is required: User model has no tenantScopePlugin,
+    // so without this the query would return users from every organisation.
+    const users = await User.find({ organizationId: req.orgId })
       .populate({
         path: 'employeeRef',
         populate: { path: 'departmentId' }
