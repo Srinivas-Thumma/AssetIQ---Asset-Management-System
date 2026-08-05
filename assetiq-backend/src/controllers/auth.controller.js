@@ -30,7 +30,7 @@ const generateTokens = (user) => {
   const accessToken = jwt.sign(
     { id: user._id, role: user.role, organizationId: user.organizationId },
     env.JWT_ACCESS_SECRET,
-    { expiresIn: '1d' } // 1 day for access tokens in local development
+    { expiresIn: '15m' } // 15 minutes for access tokens in local development
   );
   const refreshToken = jwt.sign(
     { id: user._id },
