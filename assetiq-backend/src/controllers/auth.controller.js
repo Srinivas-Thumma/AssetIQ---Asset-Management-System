@@ -160,7 +160,7 @@ export const login = async (req, res, next) => {
     if (user.organizationId) {
       const org = await Organization.findById(user.organizationId);
       if (org && org.status === 'suspended') {
-        return sendResponse(res, 403, false, 'Your organization account is suspended. Contact Support.');
+        return sendResponse(res, 403, false, 'Your organization account is suspended. :) - ENJOY');
       }
     }
 

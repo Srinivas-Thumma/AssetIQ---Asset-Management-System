@@ -17,3 +17,5 @@ export default defineConfig({
     }
   }
 })
+
+// The Socket.IO connection in SocketContext.jsx does NOT go through the Vite proxy. It connects directly to http://localhost:5000 (hardcoded when window.location.hostname is localhost). This works because the backend socket.js has its own CORS config that explicitly allows http://localhost:5173.

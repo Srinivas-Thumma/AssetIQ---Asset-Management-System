@@ -1,159 +1,20 @@
-Backend (assetiq-backend/)
-plain
-assetiq-backend/
-├── config/
-│   ├── db.js              # MongoDB connection setup
-│   └── env.js             # Environment variable loader/validator
-├── controllers/           # Request handlers (business logic orchestration)
-│   ├── admin.controller.js
-│   ├── ai.controller.js
-│   ├── asset.controller.js
-│   ├── auth.controller.js
-│   ├── location.controller.js
-│   ├── lookup.controller.js
-│   ├── maintenance.controller.js
-│   ├── reports.controller.js
-│   └── warranty.controller.js
-├── jobs/                  # Cron/scheduled tasks
-│   ├── healthScore.job.js      # Nightly AI health score recalculation
-│   └── warrantyAlert.job.js    # Daily warranty expiration alerts
-├── middlewares/           # Express middleware stack
-│   ├── auth.middleware.js      # JWT verification (protect)
-│   ├── error.middleware.js     # Global error handler
-│   ├── rbac.middleware.js      # Role-based access control (requireRole)
-│   └── tenant.middleware.js    # Tenant extraction & context setup
-├── models/                # Mongoose schemas
-│   ├── plugins/
-│   │   └── tenantScope.plugin.js   # Auto-injects organizationId into queries
-│   ├── AiAuditLogs.js
-│   ├── Asset.js
-│   ├── AssetAssignment.js
-│   ├── Branch.js
-│   ├── Building.js
-│   ├── Category.js
-│   ├── Department.js
-│   ├── Employee.js
-│   ├── Floor.js
-│   ├── MaintenanceHistory.js
-│   ├── MaintenanceRequest.js
-│   ├── Organization.js
-│   ├── Plan.js
-│   ├── Room.js
-│   ├── User.js
-│   ├── Vendor.js
-│   └── Warranty.js
-├── routes/                # Express route definitions
-│   ├── admin.route.js
-│   ├── ai.route.js
-│   ├── asset.route.js
-│   ├── auth.route.js
-│   ├── location.route.js
-│   ├── lookup.route.js
-│   ├── maintenance.route.js
-│   ├── reports.route.js
-│   └── warranty.route.js
-├── services/              # Pure business logic (reusable, no req/res)
-│   ├── ai.service.js      # Ollama/mock AI integration
-│   └── qr.service.js      # QR code generation
-├── utils/                 # Helper utilities
-│   ├── apiResponse.js     # Standardized response formatter
-│   ├── asyncHandler.js    # Wrapper to catch async errors
-│   ├── tenantContext.js   # AsyncLocalStorage for tenant isolation
-│   ├── verifyHealth.js    # Diagnostic check script (npm run test:health)
-│   └── app.js             # Express app configuration (middleware, routes)
-├── .env                   # Environment variables
-├── package.json
-├── package-lock.json
-└── server.js              # Entry point — starts HTTP server
-Frontend (assetiq-frontend/)
-plain
-assetiq-frontend/
-├── dist/                  # Vite production build output
-├── public/                # Static assets
-├── src/
-│   ├── assets/
-│   │   └── react.svg
-│   ├── context/
-│   │   └── AuthContext.jsx    # Global auth state + token refresh
-│   ├── views/             # Page components (your "pages")
-│   │   ├── Assets.jsx
-│   │   ├── Dashboard.jsx
-│   │   ├── Locations.jsx
-│   │   ├── Login.jsx
-│   │   ├── Maintenance.jsx
-│   │   ├── OrganizationSetup.jsx
-│   │   ├── Register.jsx
-│   │   ├── Reports.jsx
-│   │   ├── SuperAdmin.jsx
-│   │   └── Warranties.jsx
-│   ├── App.css            # Global app styles
-│   ├── App.jsx            # Root component + React Router setup
-│   ├── index.css          # Tailwind/base styles
-│   └── main.jsx           # React DOM entry point
-├── index.html             # HTML template
-├── package.json
-├── package-lock.json
-├── postcss.config.js
-├── eslint.config.js
-└── .gitignore
-🔗 ARCHITECTURE FLOW (What We'll Trace)
-plain
-┌─────────────────────────────────────────────────────────────────┐
-│                         REQUEST LIFECYCLE                        │
-├─────────────────────────────────────────────────────────────────┤
-│  server.js → app.js → [tenant.middleware] → [auth.middleware]   │
-│       → [rbac.middleware] → routes → controller → service       │
-│       → model (tenantScope.plugin auto-injects orgId) → MongoDB │
-└─────────────────────────────────────────────────────────────────┘
+HTTP Request
+    │
+    ▼
+Route file (e.g. asset.route.js)
+    │  declares HTTP verb, path, and which middlewares/controllers handle it
+    ▼
+Middleware chain
+    │  protect → tenantScope → requireRole
+    ▼
+Controller (e.g. asset.controller.js)
+    │  validates input, calls models/services, calls sendResponse()
+    ▼
+Mongoose Model (e.g. Asset.js)
+    │  schema definition + tenantScopePlugin + indexes
+    ▼
+MongoDB (via Mongoose)
 
-┌─────────────────────────────────────────────────────────────────┐
-│                      FRONTEND LIFECYCLE                          │
-├─────────────────────────────────────────────────────────────────┤
-│  main.jsx → App.jsx (Router) → AuthContext.Provider             │
-│       → Route Guard → Page Component → API Call (with refresh)  │
-│       → Re-render with data                                     │
-└─────────────────────────────────────────────────────────────────┘
-🎯 READY TO START — Paste in This Order
-Let's trace the entire data flow from server boot to database hit. Paste these files one by one:
 
-Phase 1: Backend Foundation
-server.js
-app.js
-config/env.js
-config/db.js
 
-Phase 2: Security & Tenant Isolation
-utils/tenantContext.js
-models/plugins/tenantScope.plugin.js
-middlewares/tenant.middleware.js
-middlewares/auth.middleware.js
-middlewares/rbac.middleware.js
 
-Phase 3: Core Models
-models/Organization.js
-models/User.js
-models/Asset.js
-models/Employee.js
-
-Phase 4: Services & Utilities
-utils/asyncHandler.js
-utils/apiResponse.js
-services/ai.service.js
-services/qr.service.js
-
-Phase 5: Controllers & Routes
-controllers/auth.controller.js
-routes/auth.route.js
-controllers/asset.controller.js
-routes/asset.route.js
-
-Phase 6: Frontend Foundation
-main.jsx
-App.jsx
-context/AuthContext.jsx
-
-Phase 7: Frontend Pages
-views/Login.jsx
-views/Dashboard.jsx
-views/Assets.jsx
-views/SuperAdmin.jsx

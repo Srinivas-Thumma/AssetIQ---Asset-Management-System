@@ -19,6 +19,8 @@ import {
   PlusCircle, Database, CreditCard, Building2, Tag, Briefcase, Users
 } from 'lucide-react';
 
+// Root component: custom router state, view switcher, notification listener, session guards.
+
 function AppContent() {
   const { user, loading, logout, apiCall } = useAuth();
   const { socket } = useSocket();
@@ -93,7 +95,7 @@ function AppContent() {
   useEffect(() => {
     if (user) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 120000); // Poll every 2 mins as fallback
+      const interval = setInterval(fetchNotifications, 600000); // Poll every 10 mins as fallback
       return () => clearInterval(interval);
     }
   }, [user]);

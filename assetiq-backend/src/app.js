@@ -1,3 +1,6 @@
+// Creates the Express app, registers global middleware, mounts all route prefixes, registers the error handler.
+
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -54,6 +57,9 @@ app.get('/health', async (req, res) => {
       ollamaStatus = 'unreachable';
     }
   }
+  //  If mock mode is off, it sends a real fetch request to your Ollama AI instance (/api/tags).
+  // It uses an AbortController to cancel the request if Ollama takes longer than 1 second to reply. The endpoint then returns a JSON object with the overall health status, including database and Ollama responsiveness, along with a timestamp.
+  
 
   const overallUP = dbState === 1;
 

@@ -9,7 +9,11 @@ import { startSlaCheckJob } from './src/jobs/slaCheck.job.js';
 import { Plan } from './src/models/Plan.js';
 import { User } from './src/models/User.js';
 
-const seedGlobalData = async () => {
+// Entry point. Orchestrates startup sequence: DB connect → seed → jobs → HTTP server → Socket.IO.
+
+//seedGlobalData() runs on every server start — it uses findOne checks before creating, so it’s idempotent. No data is duplicated. But it does hit the database on every boot.
+
+const seedGlobalData = async () => { //Creates Free/Pro Plans and default super_admin if missing
   try {
     // 1. Seed Plans
     let freePlan = await Plan.findOne({ slug: 'free' });
@@ -59,20 +63,20 @@ const startServer = async () => {
   await seedGlobalData();
 
   // 3. Start Background Jobs
-  startWarrantyJob();
-  startHealthScoreJob();
+  startWarrantyJob();// registers cron - doesnt run immediately
+  startHealthScoreJob(); 
   startSlaCheckJob();
 
   // 4. Create HTTP Server & Attach Socket.IO Infrastructure
-  const server = http.createServer(app);
-  initSocket(server);
+  const server = http.createServer(app); 
+  initSocket(server); // wraps Express in a raw HTTP server and attaches Socket.IO to that server. This allows Socket.IO to share the same port as Express, enabling real-time bidirectional communication alongside standard HTTP requests.
 
   // 5. Listen
   server.listen(env.PORT, () => {
     console.log(`🚀 AssetIQ Server running on http://localhost:${env.PORT}`);
     console.log(`📡 Health Check URL: http://localhost:${env.PORT}/health`);
     console.log(`⚡ Socket.IO Infrastructure active on port ${env.PORT}`);
-  });
+  }); // starts accepting incoming HTTP requests and Socket.IO connections on the specified port.
 };
 
 startServer().catch((err) => {
