@@ -4,6 +4,9 @@ import { verifyTokenAndGetUser } from '../middlewares/auth.middleware.js';
 import { MaintenanceRequest } from '../models/MaintenanceRequest.js';
 import { MaintenanceMessage } from '../models/MaintenanceMessage.js';
 import { Asset } from '../models/Asset.js';
+import { SupportTicket } from '../models/SupportTicket.js';
+import { SupportMessage } from '../models/SupportMessage.js';
+import { Notification } from '../models/Notification.js';
 import { dispatchChatNotifications } from '../services/notification.service.js';
 import {
   canUserAccessConversation,
@@ -11,25 +14,36 @@ import {
   updateLastRead,
 } from '../services/conversation.service.js';
 
-// initSocket(server) — attaches Socket.IO to the HTTP server.
-
+/**
+ * Socket.IO Instance Reference
+ * Global singleton reference to the running Socket.IO server instance.
+ */
 let io = null;
 
+/**
+ * Maintenance Chat Access Permission Guard:
+ * Verifies if an authenticated socket user has authorization to enter or post messages
+ * in a maintenance request chat room.
+ *
+ * Rules:
+ * - Super Admins & Org Admins & Asset Managers: Full org-level access.
+ * - Employees: Access restricted to requests they created or assets assigned to them.
+ */
 const checkChatAccessPermission = async (socket, requestId) => {
   if (!requestId) {
     return { authorized: false, reason: 'Request ID is required' };
-  } // Defines an internal authorization function. It instantly blocks users if they attempt to enter a legacy room without a requestId.
+  }
 
   let request = null;
   if (socket.user.role === 'super_admin' && !socket.orgId) {
     request = await MaintenanceRequest.findById(requestId);
   } else {
     request = await MaintenanceRequest.findOne({ _id: requestId, organizationId: socket.orgId });
-  } // Fetches the targeted database ticket. Global super_admin accounts bypass tenancy filters. Normal users are strictly limited to their own company’s workspace via socket.orgId (preventing cross-tenant data leaks)
+  }
 
   if (!request) {
     return { authorized: false, reason: 'Maintenance request not found or cross-tenant access denied' };
-  } // Returns a rejection block if the ticket does not exist, or belongs to a different enterprise account.
+  }
 
   if (['super_admin', 'org_admin', 'asset_manager'].includes(socket.user.role)) {
     return { authorized: true, request };
@@ -47,53 +61,98 @@ const checkChatAccessPermission = async (socket, requestId) => {
       return { authorized: true, request };
     }
     return { authorized: false, reason: 'Forbidden: Employees can only access chat for their assigned or raised requests' };
-  } // Enforces strict policies for base-level employee accounts. They can only join if they either created the maintenance ticket (isRaisedBy) or if the physical equipment is actively assigned to them (isAssigned)
+  }
 
   return { authorized: false, reason: 'Forbidden: Insufficient privileges' };
-  //Fallback default rejection layer for unrecognised client profiles.
 };
 
+/**
+ * Support Ticket Access Permission Guard:
+ * Verifies if an authenticated socket user has authorization to enter or post messages
+ * in a 1:1 support ticket room.
+ *
+ * Rules:
+ * - Raised By user OR Recipient user: Authorized.
+ * - Super Admin (for platform_support type): Authorized unscoped across orgs.
+ */
+const checkSupportTicketAccessPermission = async (socket, ticketId) => {
+  if (!ticketId) {
+    return { authorized: false, reason: 'Ticket ID is required' };
+  }
+
+  let ticket = null;
+  if (socket.user.role === 'super_admin') {
+    ticket = await SupportTicket.findById(ticketId);
+  } else {
+    ticket = await SupportTicket.findById(ticketId);
+  }
+
+  if (!ticket) {
+    return { authorized: false, reason: 'Support ticket not found or cross-tenant access denied' };
+  }
+
+  const isRaisedBy = ticket.raisedBy.toString() === socket.user._id.toString();
+  const isRecipient = ticket.recipientId.toString() === socket.user._id.toString();
+  const isSuperAdminPlatform = socket.user.role === 'super_admin' && ticket.type === 'platform_support';
+
+  if (isRaisedBy || isRecipient || isSuperAdminPlatform) {
+    return { authorized: true, ticket };
+  }
+
+  return { authorized: false, reason: 'Access denied: You are not a participant in this support ticket' };
+};
+
+/**
+ * Initialize Socket.IO Server:
+ * Mounts Socket.IO server onto the HTTP server instance, sets up authentication handshake middleware,
+ * user/org room subscriptions, and real-time event listeners.
+ */
 export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
       origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
       credentials: true,
     },
-  }); //  Mounts the raw Server module onto an underlying running Node.js HTTP instances. It configures Cross-Origin Resource Sharing (CORS) to accept incoming connections from common local development frontends (like Vite on port 5173), and allows browser cookies/credentials to pass through securely.
+  });
 
+  // Handshake Authentication Middleware: Validates JWT token from cookies or auth headers
   io.use(async (socket, next) => {
     try {
       const rawCookieHeader = socket.handshake.headers?.cookie || '';
       const parsedCookies = cookie.parse(rawCookieHeader);
       const token = parsedCookies.accessToken || socket.handshake.auth?.token;
-      // Sets up a connection-guard middleware. Before any device is allowed to exchange data, this code extracts a JWT (accessToken) from either browser cookie storage headers or the standard client handshake payload object.
 
       if (!token) {
         return next(new Error('Authentication failed: No token provided'));
-      } // If no token is detected, it terminates the WebSocket handshake early with an error.
+      }
 
       const user = await verifyTokenAndGetUser(token);
       socket.user = user;
       socket.orgId = user.organizationId ? user.organizationId.toString() : null;
-      // Decodes the token. If verified, it pins the complete user schema instance and their flat orgId text string directly to the temporary, active socket connection context object.
-      next(); // Invokes next() to proceed and finalize the link.
+
+      next();
     } catch (err) {
       console.error(`❌ Socket Auth Rejected (${socket.id}):`, err.message);
       next(new Error(`Authentication failed: ${err.message}`));
     }
   });
 
+  // Socket Connection Event Lifecycle
   io.on('connection', (socket) => {
-    const userIdStr = socket.user._id.toString(); //Fires every time an authenticated frontend successfully establishes an open channel.
+    const userIdStr = socket.user._id.toString();
 
+    // Auto-join private user room (`user:<userId>`) and tenant org room (`org:<orgId>`)
     socket.join(`user:${userIdStr}`);
     if (socket.orgId) {
       socket.join(`org:${socket.orgId}`);
-    } //Forces the unique socket pipeline to subscribe to two foundational system-wide rooms: a direct private message vault (user:ID) and an internal enterprise broadcast list (org:ID).
+    }
 
     console.log(`🔌 Socket ${socket.id} connected for User [${socket.user.email}] (${socket.user.role}). Joined rooms:`, Array.from(socket.rooms));
 
-    // Unified Conversation Socket Handlers
+    /**
+     * Unified Polymorphic Conversation Socket Handlers:
+     * Handles joining rooms, live messaging, typing indicators, and read receipts across all conversation types.
+     */
     socket.on('conversation:join', async ({ conversationId }) => {
       try {
         const { authorized, reason } = await canUserAccessConversation(socket.user, conversationId);
@@ -108,7 +167,7 @@ export const initSocket = (server) => {
       } catch (err) {
         socket.emit('conversation:error', { conversationId, message: err.message });
       }
-    }); // Implements room management for the modern messaging tier. It receives a conversationId, evaluates user rights against the unified access framework service, joins the specific room, and sends back an confirmation receipt event (conversation:joined) to the user.
+    });
 
     socket.on('conversation:message', async ({ conversationId, message, isInternalNote, attachments }) => {
       try {
@@ -119,7 +178,7 @@ export const initSocket = (server) => {
           isInternalNote,
           attachments,
         });
-   
+
         const roomName = `conversation:${conversationId}`;
         io.to(roomName).emit('conversation:message', result.message);
 
@@ -132,7 +191,7 @@ export const initSocket = (server) => {
       } catch (err) {
         socket.emit('conversation:error', { conversationId, message: err.message });
       }
-    }); //  Listens for chat posts in the new conversation layout. It updates the database using postMessageToConversation, broadcasts the actual message object inside that room, and pings the organization-wide channel (org:ID) so a global notification badge can light up for other online team members.
+    });
 
     socket.on('conversation:typing', ({ conversationId, isTyping }) => {
       const roomName = `conversation:${conversationId}`;
@@ -152,7 +211,102 @@ export const initSocket = (server) => {
       }
     });
 
-    // Legacy Maintenance Chat Room Handlers (Backward Compatibility)
+    /**
+     * Support Ticket 1:1 Real-time Messaging Handlers:
+     * Manages 1:1 platform support and internal messaging rooms with auto-reopening for resolved tickets.
+     */
+    socket.on('support:join', async ({ ticketId }) => {
+      try {
+        const { authorized, reason } = await checkSupportTicketAccessPermission(socket, ticketId);
+        if (!authorized) {
+          console.warn(`🛑 Support Join Denied for Socket ${socket.id} (${socket.user.email}) on Ticket [${ticketId}]: ${reason}`);
+          socket.emit('support:error', { ticketId, message: reason });
+          return;
+        }
+
+        const roomName = `support:ticket:${ticketId}`;
+        socket.join(roomName);
+        console.log(`💬 Socket ${socket.id} (${socket.user.email}) joined support ticket room [${roomName}]`);
+        socket.emit('support:joined', { ticketId, room: roomName });
+      } catch (err) {
+        console.error('❌ Support Join Error:', err.message);
+        socket.emit('support:error', { ticketId, message: 'Server error during support ticket join' });
+      }
+    });
+
+    socket.on('support:typing', ({ ticketId, isTyping }) => {
+      const roomName = `support:ticket:${ticketId}`;
+      socket.to(roomName).emit('support:user_typing', {
+        ticketId,
+        userEmail: socket.user.email,
+        isTyping,
+      });
+    });
+
+    socket.on('support:message', async ({ ticketId, message }) => {
+      try {
+        if (!message || !message.trim()) {
+          socket.emit('support:error', { ticketId, message: 'Message content cannot be empty' });
+          return;
+        }
+
+        const { authorized, reason, ticket } = await checkSupportTicketAccessPermission(socket, ticketId);
+        if (!authorized) {
+          console.warn(`🛑 Support Message Blocked for Socket ${socket.id} (${socket.user.email}) on Ticket [${ticketId}]: ${reason}`);
+          socket.emit('support:error', { ticketId, message: reason });
+          return;
+        }
+
+        // Auto-reopen resolved ticket if a new message arrives during active conversation
+        if (ticket.status === 'resolved') {
+          ticket.status = 'in_progress';
+          await ticket.save();
+        }
+
+        const newMessage = await SupportMessage.create({
+          organizationId: ticket.organizationId,
+          ticketId,
+          senderId: socket.user._id,
+          senderName: socket.user.email.split('@')[0],
+          senderRole: socket.user.role,
+          message: message.trim(),
+        });
+
+        const roomName = `support:ticket:${ticketId}`;
+        io.to(roomName).emit('support:message', newMessage);
+
+        // Dispatch live in-app notification to the other participant's private user room
+        const otherUserId = ticket.raisedBy.toString() === socket.user._id.toString()
+          ? ticket.recipientId
+          : ticket.raisedBy;
+
+        const senderPrefix = socket.user.email.split('@')[0];
+        const preview = message.trim().length > 45 ? `${message.trim().slice(0, 45)}...` : message.trim();
+
+        try {
+          const notifDoc = await Notification.create({
+            organizationId: ticket.organizationId,
+            userId: otherUserId,
+            message: `💬 New support message from ${senderPrefix}: "${preview}"`,
+            type: 'chat_message',
+            relatedId: ticketId,
+            read: false,
+          });
+
+          io.to(`user:${otherUserId.toString()}`).emit('notification:new', notifDoc);
+        } catch (notifErr) {
+          console.error('⚠️ Support notification generation issue:', notifErr.message);
+        }
+      } catch (err) {
+        console.error('❌ Support Message Error:', err.message);
+        socket.emit('support:error', { ticketId, message: 'Failed to send support message' });
+      }
+    });
+
+    /**
+     * Legacy Maintenance Chat Handlers:
+     * Maintained for backward compatibility with older maintenance chat client events.
+     */
     socket.on('chat:join', async ({ requestId }) => {
       try {
         const { authorized, reason } = await checkChatAccessPermission(socket, requestId);
@@ -167,7 +321,7 @@ export const initSocket = (server) => {
       } catch (err) {
         socket.emit('chat:error', { requestId, message: 'Server error during chat join' });
       }
-    }); //Runs the legacy chat room entry protocol. It applies the detailed permission logic from lines 18–51. If allowed, the socket enters the chat:request:ID room namespace
+    });
 
     socket.on('chat:message', async ({ requestId, message }) => {
       try {
@@ -180,7 +334,7 @@ export const initSocket = (server) => {
         if (!authorized) {
           socket.emit('chat:error', { requestId, message: reason });
           return;
-        } // Handles traditional maintenance messaging. It strips leading and trailing whitespaces from incoming payloads, validates content integrity, and re-verifies channel permissions on the fly
+        }
 
         const newMessage = await MaintenanceMessage.create({
           organizationId: request.organizationId,
@@ -199,7 +353,7 @@ export const initSocket = (server) => {
             requestId,
             senderEmail: socket.user.email,
           });
-        } //Persists the message into the legacy MaintenanceMessage collection. It generates a display alias by stripping out email addresses (e.g., john.doe@org.com becomes john.doe), broadcasts the message payload to the ticket chat, and notifies the root organizational branch.
+        }
 
         await dispatchChatNotifications({
           requestId,
@@ -209,6 +363,7 @@ export const initSocket = (server) => {
           io,
         });
       } catch (err) {
+        console.error('❌ Chat Message Error:', err.message);
         socket.emit('chat:error', { requestId, message: 'Failed to send chat message' });
       }
     });
@@ -221,6 +376,10 @@ export const initSocket = (server) => {
   return io;
 };
 
+/**
+ * Get Socket.IO Instance:
+ * Exposes running io instance for service invocations outside the socket connection loop.
+ */
 export const getIO = () => {
   if (!io) {
     throw new Error('Socket.io has not been initialized yet!');

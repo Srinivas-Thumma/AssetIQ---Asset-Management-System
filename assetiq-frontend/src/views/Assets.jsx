@@ -382,34 +382,35 @@ export default function Assets() {
               <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
                 {assets.map((asset) => {
                   let statusColor = 'bg-slate-100 text-slate-700 border-slate-200';
-                  if (asset.status === 'available') statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                  if (asset.status === 'assigned') statusColor = 'bg-blue-50 text-blue-700 border-blue-100';
-                  if (asset.status === 'under_maintenance') statusColor = 'bg-amber-50 text-amber-700 border-amber-100';
-                  if (asset.status === 'damaged') statusColor = 'bg-red-50 text-red-700 border-red-100';
+                  if (asset.status === 'available') statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                  if (asset.status === 'assigned') statusColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                  if (asset.status === 'under_maintenance') statusColor = 'bg-amber-50 text-amber-700 border-amber-200';
+                  if (asset.status === 'damaged') statusColor = 'bg-rose-50 text-rose-700 border-rose-200';
+                  if (asset.status === 'retired') statusColor = 'bg-slate-100 text-slate-700 border-slate-200';
                   
                   const health = asset.ai?.healthScore ?? 100;
                   let healthColor = 'text-emerald-600';
-                  if (health < 40) healthColor = 'text-red-500';
-                  else if (health < 75) healthColor = 'text-amber-500';
+                  if (health < 40) healthColor = 'text-rose-600';
+                  else if (health < 75) healthColor = 'text-amber-600';
 
                   return (
-                    <tr key={asset._id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={asset._id} className="hover:bg-purple-50/70 transition-all duration-150">
                       <td className="py-4 px-6 font-mono font-bold text-slate-900">{asset.assetCode}</td>
                       <td className="py-4 px-6 font-medium text-slate-800">{asset.name}</td>
                       <td className="py-4 px-6">{asset.categoryId?.name || 'N/A'}</td>
                       <td className="py-4 px-6 text-xs text-slate-500">
                         {asset.roomId?.name || 'N/A'}
-                        <span className="block text-[10px] text-slate-400">
+                        <span className="block text-xs text-slate-400">
                           {asset.roomId?.floorId?.name || ''} ({asset.roomId?.floorId?.buildingId?.name || ''})
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusColor}`}>
-                          {asset.status}
+                        <span className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-lg border ${statusColor}`}>
+                          {asset.status?.replace('_', ' ')?.toUpperCase()}
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`flex items-center gap-1.5 font-bold ${healthColor}`}>
+                        <span className={`flex items-center gap-1.5 font-bold text-xs ${healthColor}`}>
                           <Activity className="h-4 w-4" />
                           {health}%
                         </span>

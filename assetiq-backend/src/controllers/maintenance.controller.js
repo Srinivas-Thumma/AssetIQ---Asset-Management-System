@@ -3,7 +3,6 @@ import { MaintenanceHistory } from '../models/MaintenanceHistory.js';
 import { MaintenanceMessage } from '../models/MaintenanceMessage.js';
 import { Asset } from '../models/Asset.js';
 import { analyzeAssetHealth } from '../services/ai.service.js';
-import { dispatchChatNotifications } from '../services/notification.service.js';
 import {
   getOrCreateMaintenanceConversation,
   getConversationMessages,

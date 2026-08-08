@@ -220,20 +220,20 @@ export default function Maintenance({ notifications = [], onRefreshNotifications
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Maintenance Tickets</h1>
-          <p className="text-slate-500 mt-1">Schedule servicing, resolve breakdown reports, and track repair billing logs.</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Maintenance Tickets</h1>
+          <p className="text-sm text-slate-500 font-normal mt-1">Schedule servicing, resolve breakdown reports, and track repair billing logs.</p>
         </div>
         <button
           onClick={() => setShowScheduleModal(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-semibold py-2.5 px-5 rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98]"
+          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm py-2 px-4 rounded-xl shadow-sm cursor-pointer transition-all duration-150"
         >
-          <Plus className="h-5 w-5" />
+          <Plus className="h-4 w-4" />
           Schedule Servicing
         </button>
       </div>
 
       {/* Grid List */}
-      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl shadow-sm overflow-hidden">
         {requests.length === 0 ? (
           <div className="text-center py-20 text-slate-400 text-sm">
             No active maintenance requests scheduled.
@@ -254,27 +254,27 @@ export default function Maintenance({ notifications = [], onRefreshNotifications
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
                 {requests.map((req) => {
-                  // Badges color code
                   let priorityColor = 'bg-slate-100 text-slate-700 border-slate-200';
-                  if (req.priority === 'high') priorityColor = 'bg-orange-50 text-orange-700 border-orange-100';
-                  if (req.priority === 'critical') priorityColor = 'bg-red-50 text-red-700 border-red-100';
-                  if (req.priority === 'low') priorityColor = 'bg-slate-50 text-slate-500 border-slate-100';
+                  if (req.priority === 'high') priorityColor = 'bg-rose-50 text-rose-700 border-rose-200';
+                  if (req.priority === 'critical') priorityColor = 'bg-rose-50 text-rose-700 border-rose-200';
+                  if (req.priority === 'medium') priorityColor = 'bg-amber-50 text-amber-700 border-amber-200';
+                  if (req.priority === 'low') priorityColor = 'bg-slate-100 text-slate-700 border-slate-200';
 
-                  let statusColor = 'bg-blue-50 text-blue-700 border-blue-100';
+                  let statusColor = 'bg-blue-50 text-blue-700 border-blue-200';
                   let statusLabel = 'Open';
                   if (req.status === 'open') {
-                    statusColor = 'bg-blue-50 text-blue-700 border-blue-100';
+                    statusColor = 'bg-blue-50 text-blue-700 border-blue-200';
                     statusLabel = 'Open';
                   } else if (req.status === 'in_progress' || req.status === 'assigned') {
-                    statusColor = 'bg-amber-50 text-amber-700 border-amber-100';
+                    statusColor = 'bg-amber-50 text-amber-700 border-amber-200';
                     statusLabel = 'In Repair';
                   } else if (req.status === 'resolved') {
-                    statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                    statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
                     statusLabel = 'Resolved';
                   }
 
                   return (
-                    <tr key={req._id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={req._id} className="hover:bg-purple-50/70 transition-all duration-150">
                       <td className="py-4 px-6">
                         <span className="font-semibold text-slate-800 block">{req.assetId?.name || 'Retired Asset'}</span>
                         <span className="text-xs font-mono font-bold text-slate-400 block mt-0.5">
@@ -282,14 +282,14 @@ export default function Maintenance({ notifications = [], onRefreshNotifications
                         </span>
                       </td>
                       <td className="py-4 px-6 capitalize">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          req.type === 'preventive' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'
+                        <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                          req.type === 'preventive' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}>
                           {req.type}
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${priorityColor} capitalize`}>
+                        <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold border ${priorityColor} capitalize`}>
                           {req.priority}
                         </span>
                       </td>
@@ -300,7 +300,7 @@ export default function Maintenance({ notifications = [], onRefreshNotifications
                         {new Date(req.scheduledDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusColor}`}>
+                        <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold border ${statusColor}`}>
                           {statusLabel}
                         </span>
                       </td>

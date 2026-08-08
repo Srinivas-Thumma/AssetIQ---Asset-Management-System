@@ -12,11 +12,12 @@ import Warranties from './views/Warranties';
 import Reports from './views/Reports';
 import SuperAdmin from './views/SuperAdmin';
 import OrganizationSetup from './views/OrganizationSetup';
+import Support from './views/Support';
 
 import { 
   ShieldCheck, LayoutDashboard, Package, MapPin, 
   Wrench, ShieldCheck as ShieldIcon, BarChart2, Globe, LogOut, User, Settings, Bell,
-  PlusCircle, Database, CreditCard, Building2, Tag, Briefcase, Users
+  PlusCircle, Database, CreditCard, Building2, Tag, Briefcase, Users, LifeBuoy
 } from 'lucide-react';
 
 // Root component: custom router state, view switcher, notification listener, session guards.
@@ -38,7 +39,7 @@ function AppContent() {
   const getTabFromPath = (path) => {
     if (!path.startsWith('/dashboard')) return 'dashboard';
     const segment = path.replace(/^\/dashboard\/?/, '').split('/')[0];
-    const validTabs = ['dashboard', 'assets', 'locations', 'maintenance', 'warranties', 'reports', 'setup', 'superadmin'];
+    const validTabs = ['dashboard', 'assets', 'locations', 'maintenance', 'warranties', 'reports', 'setup', 'superadmin', 'support'];
     return validTabs.includes(segment) ? segment : 'dashboard';
   };
 
@@ -215,6 +216,8 @@ function AppContent() {
         ) : (
           <Dashboard onNavigate={handleTabNavigate} />
         );
+      case 'support':
+        return <Support />;
       default:
         return <Dashboard onNavigate={handleTabNavigate} />;
     }
@@ -228,6 +231,7 @@ function AppContent() {
     { id: 'warranties', label: 'Warranties', icon: ShieldIcon, roles: ['org_admin', 'asset_manager', 'employee'] },
     { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['super_admin', 'org_admin', 'asset_manager'] },
     { id: 'setup', label: 'Org Setup', icon: Settings, roles: ['org_admin'] },
+    { id: 'support', label: 'Helpdesk & Support', icon: LifeBuoy, roles: ['super_admin', 'org_admin', 'asset_manager', 'employee'] },
   ];
 
   const handleLogout = () => {
@@ -517,6 +521,26 @@ function AppContent() {
                 </span>
               </button>
 
+              {/* 5. Helpdesk & Support */}
+              <button
+                onClick={() => handleTabNavigate('support')}
+                title="Helpdesk & Support"
+                className="w-full flex items-center gap-4 px-1 py-1 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+              >
+                <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                  activeTab === 'support'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25' 
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                }`}>
+                  <LifeBuoy className="h-5 w-5" />
+                </div>
+                <span className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap overflow-hidden text-ellipsis ${
+                  activeTab === 'support' ? 'text-blue-600 font-bold' : 'text-slate-600'
+                }`}>
+                  Helpdesk & Support
+                </span>
+              </button>
+
               <div className="w-full border-t border-slate-300 my-2.5" />
             </>
           )}
@@ -524,7 +548,7 @@ function AppContent() {
           {/* Standard Navigation list (Dashboard, Assets, Reports) BELOW */}
           {navItems
             .filter((item) => {
-              if (user.role === 'org_admin' && item.id === 'setup') return false;
+              if (user.role === 'org_admin' && (item.id === 'setup' || item.id === 'support')) return false;
               return item.roles.includes(user.role);
             })
             .map((item) => {

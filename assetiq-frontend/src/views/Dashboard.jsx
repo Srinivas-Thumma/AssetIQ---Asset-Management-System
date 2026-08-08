@@ -114,53 +114,56 @@ export default function Dashboard({ onNavigate }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{getDashboardTitle()}</h1>
-          <p className="text-slate-500 mt-1">Real-time tenant asset metrics and AI health scores.</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            {getDashboardTitle()}
+          </h1>
+          <p className="text-sm text-slate-500 font-normal mt-1">
+            Real-time telemetry, predictive AI health scores, and asset lifecycle oversight
+          </p>
         </div>
+
         <button
           onClick={fetchDashboardStats}
           disabled={refreshing}
-          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl shadow-sm cursor-pointer disabled:opacity-50"
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm rounded-xl shadow-sm flex items-center gap-2 transition-all duration-150 cursor-pointer disabled:opacity-50 self-start md:self-auto"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh Stats
+          {refreshing ? 'Syncing...' : 'Sync Telemetry'}
         </button>
       </div>
 
-      {/* --- EXECUTIVE TELEMETRY CONTAINER (Reference Design) --- */}
-      <div className="bg-[#0b0f19] border border-slate-800 rounded-3xl p-6 shadow-2xl text-white space-y-6">
-        
-        {/* Window Title Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-rose-500 inline-block" />
-              <span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />
-              <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
-            </div>
-            <span className="text-xs font-semibold text-slate-300 font-mono tracking-wide ml-2">
+      {/* Dark Analytical Terminal Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6 shadow-sm">
+        {/* Terminal Header */}
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full bg-rose-500 inline-block" />
+            <span className="h-3 w-3 rounded-full bg-amber-500 inline-block" />
+            <span className="h-3 w-3 rounded-full bg-emerald-500 inline-block" />
+            <span className="text-xs font-semibold text-slate-400 font-mono tracking-wide ml-2">
               Workspace: <strong className="text-white font-bold">{user?.organizationName || user?.organizationId?.name || 'AssetIQ Enterprise'}</strong>
             </span>
           </div>
         </div>
 
         {/* Top Row: 3 Metric Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: TOTAL INVENTORY */}
-          <div className="bg-[#121827] border border-slate-800/90 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 flex flex-col justify-between space-y-4">
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">
                 TOTAL INVENTORY
               </span>
-              <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-                {stats?.total || assets.length || 0} <span className="text-xl font-bold text-slate-200">Active Assets</span>
+              <h2 className="text-2xl font-bold text-white tracking-tight">
+                {stats?.total || assets.length || 0} <span className="text-base font-semibold text-slate-300">Active Assets</span>
               </h2>
             </div>
-            <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, Math.max(15, ((stats?.total || assets.length || 0) / Math.max(1, stats?.total || assets.length || 1)) * 100))}%` }}
               />
             </div>

@@ -15,6 +15,6 @@ router.post('/refresh', refresh);
 router.use('/users', protect, tenantScope);
 router.route('/users')
   .post(requireRole('org_admin', 'super_admin'), createOrgUser)
-  .get(requireRole('org_admin', 'super_admin'), getOrgUsers);
+  .get(requireRole('org_admin', 'super_admin', 'asset_manager', 'employee'), getOrgUsers);
 
 export default router;

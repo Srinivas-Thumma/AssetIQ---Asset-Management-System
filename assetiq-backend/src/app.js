@@ -1,5 +1,9 @@
-// Creates the Express app, registers global middleware, mounts all route prefixes, registers the error handler.
-
+/**
+ * Express Application Configuration:
+ * Initializes Express instance, attaches security and parsing middlewares,
+ * defines the /health diagnostics check endpoint, mounts all subsystem API routers,
+ * and registers the global error handler.
+ */
 
 import express from 'express';
 import cors from 'cors';
@@ -9,7 +13,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 
-// Route Imports
+// Route Imports for Subsystem Endpoints
 import authRouter from './routes/auth.route.js';
 import locationRouter from './routes/location.route.js';
 import lookupRouter from './routes/lookup.route.js';
@@ -26,19 +30,30 @@ import conversationRouter from './routes/conversation.route.js';
 import approvalRouter from './routes/approval.route.js';
 import timelineRouter from './routes/timeline.route.js';
 import searchRouter from './routes/search.route.js';
+import supportRouter from './routes/support.route.js';
 
 const app = express();
 
-// Middlewares
+/**
+ * Global Middlewares:
+ * - CORS: Allows credentials and requests from trusted Vite dev origins.
+ * - Cookie Parser: Parses HTTP cookies for JWT auth.
+ * - JSON Parser: Parses incoming JSON request payloads.
+ * - Morgan: HTTP request logging in development mode.
+ */
 app.use(cors({
   origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true
 }));
 app.use(cookieParser());
-app.use(express.json()); // Parse JSON bodies
+app.use(express.json());
 app.use(morgan('dev'));
 
-// GET /health Endpoint (Observability & diagnostics check)
+/**
+ * GET /health Endpoint:
+ * Observability & health check endpoint verifying database connectivity
+ * and local Ollama AI engine responsiveness.
+ */
 app.get('/health', async (req, res) => {
   const dbState = mongoose.connection.readyState;
   const dbStatus = dbState === 1 ? 'connected' : 'disconnected';
@@ -57,9 +72,6 @@ app.get('/health', async (req, res) => {
       ollamaStatus = 'unreachable';
     }
   }
-  //  If mock mode is off, it sends a real fetch request to your Ollama AI instance (/api/tags).
-  // It uses an AbortController to cancel the request if Ollama takes longer than 1 second to reply. The endpoint then returns a JSON object with the overall health status, including database and Ollama responsiveness, along with a timestamp.
-  
 
   const overallUP = dbState === 1;
 
@@ -74,7 +86,9 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// API Routes
+/**
+ * Subsystem API Routes Mounting (/api/v1/*)
+ */
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/locations', locationRouter);
 app.use('/api/v1/lookups', lookupRouter);
@@ -91,8 +105,11 @@ app.use('/api/v1/conversations', conversationRouter);
 app.use('/api/v1/approvals', approvalRouter);
 app.use('/api/v1/timelines', timelineRouter);
 app.use('/api/v1/search', searchRouter);
+app.use('/api/v1/support', supportRouter);
 
-// Global Error Handler
+/**
+ * Global Centralized Error Handler Middleware
+ */
 app.use(errorHandler);
 
 export default app;
